@@ -1,0 +1,49 @@
+flowchart LR
+    Browser[Browser<br/>React + Ant Design]
+
+    subgraph nginx[nginx :80]
+        SPA[/ static SPA /]
+        Proxy[/ proxy /api /]
+    end
+
+    Browser --> SPA
+    Browser --> Proxy
+
+    subgraph svc[Spring Boot 4 / Java 25 services]
+        API[api-service :8080<br/>WebFlux]
+        Gateway[ai-gateway :8081<br/>Spring AI + openai-java SDK]
+        Calc[calculation-service :8082]
+        SBA[spring-boot-admin :9000]
+    end
+
+    Proxy --> API
+    API -- "REST + SSE" --> Gateway
+    API -- "Kafka calc.requests" --> Calc
+    Calc -- "Kafka calc.results" --> API
+    Calc -- "Kafka ai.requests / ai.responses (correlation id)" --> Gateway
+    Gateway -- "OpenAI Chat / Batch" --> OpenAI[(OpenAI)]
+
+    subgraph data[Data plane]
+        PG[(Postgres 16<br/>schemas: app · calc · ai)]
+        Kafka[(Kafka KRaft<br/>topics created Step 7)]
+    end
+
+    API --> PG
+    Calc --> PG
+    Gateway --> PG
+    API --- Kafka
+    Calc --- Kafka
+    Gateway --- Kafka
+
+    subgraph obs[Observability]
+        ES[(Elasticsearch)]
+        LS[Logstash :5000]
+        KB[Kibana :5601]
+        JG[Jaeger :16686]
+    end
+
+    svc -. "JSON logs<br/>(Step 11)" .-> LS
+    LS --> ES
+    ES --> KB
+    svc -. "OTLP traces<br/>(Step 11)" .-> JG
+    svc -. "register" .-> SBA

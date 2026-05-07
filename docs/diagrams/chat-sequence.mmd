@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant nginx
+    participant API as api-service (WebFlux)
+    participant Gateway as ai-gateway
+    participant OpenAI
+
+    Browser->>nginx: GET /api/chats/{id}/stream (EventSource)
+    nginx->>API: proxy_pass (proxy_buffering off)
+    API->>Gateway: GET /v1/chat/stream (Spring WebClient SSE)
+    Gateway->>OpenAI: ChatClient.stream(...)
+    loop for each token
+        OpenAI-->>Gateway: SSE: {"delta":"…"}
+        Gateway-->>API: SSE: ChatChunk
+        API-->>nginx: SSE: ChatChunk
+        nginx-->>Browser: SSE: ChatChunk
+    end
+    OpenAI-->>Gateway: SSE: [DONE]
+    Gateway-->>API: complete
+    API-->>Browser: SSE: end

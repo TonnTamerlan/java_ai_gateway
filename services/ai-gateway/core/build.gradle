@@ -1,0 +1,16 @@
+plugins {
+    id 'goose.spring-boot-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'AI Gateway — REST + Kafka entry point to AI providers.'
+
+springBoot {
+    mainClass = 'com.typedgoose.aigateway.AiGatewayApplication'
+}
+
+dependencies {
+    implementation project(':services:shared-contracts')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation libs.spring.boot.admin.starter.client
+}

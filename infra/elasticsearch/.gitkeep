@@ -1,0 +1,2 @@
+# All ES config is currently inline in docker-compose env vars (single-node,
+# security disabled). Move here if it grows beyond two settings.

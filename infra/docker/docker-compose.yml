@@ -1,0 +1,207 @@
+name: goose
+
+networks:
+  goose:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  kafka-data:
+  elasticsearch-data:
+
+services:
+  # ── Infrastructure ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: goose
+      POSTGRES_PASSWORD: goose
+      POSTGRES_DB: goose
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goose"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [goose]
+
+  kafka:
+    image: bitnami/kafka:3.8
+    environment:
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "false"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/bitnami/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [goose]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.16.1
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.16.1
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+    volumes:
+      - ../logstash/pipeline.conf:/usr/share/logstash/pipeline/pipeline.conf:ro
+    ports:
+      - "5000:5000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9600/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.16.1
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5601/api/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:14269/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [goose]
+
+  # ── Application ───────────────────────────────────────────────────────────
+  spring-boot-admin:
+    build:
+      context: ../..
+      dockerfile: infra/spring-boot-admin/Dockerfile
+    environment:
+      SERVER_PORT: 9000
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:9000/actuator/health | grep -q '\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  ai-gateway:
+    build:
+      context: ../..
+      dockerfile: services/ai-gateway/core/Dockerfile
+    environment:
+      SPRING_BOOT_ADMIN_URL: http://spring-boot-admin:9000
+      SERVICE_BASE_URL: http://ai-gateway:8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      spring-boot-admin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8081/actuator/health | grep -q '\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  api-service:
+    build:
+      context: ../..
+      dockerfile: services/api-service/Dockerfile
+    environment:
+      SPRING_BOOT_ADMIN_URL: http://spring-boot-admin:9000
+      SERVICE_BASE_URL: http://api-service:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      spring-boot-admin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health | grep -q '\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  calculation-service:
+    build:
+      context: ../..
+      dockerfile: services/calculation-service/Dockerfile
+    environment:
+      SPRING_BOOT_ADMIN_URL: http://spring-boot-admin:9000
+      SERVICE_BASE_URL: http://calculation-service:8082
+    ports:
+      - "8082:8082"
+    depends_on:
+      spring-boot-admin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8082/actuator/health | grep -q '\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [goose]
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: infra/nginx/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      api-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [goose]

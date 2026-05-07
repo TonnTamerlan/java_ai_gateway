@@ -1,0 +1,2 @@
+# Jaeger all-in-one is configured via env vars in docker-compose for Step 1.
+# Sampling/storage tuning, if any, lands here in Step 11.

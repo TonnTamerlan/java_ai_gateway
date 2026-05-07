@@ -1,0 +1,9 @@
+plugins {
+    id 'goose.java-conventions'
+}
+
+dependencies {
+    testImplementation "org.junit.jupiter:junit-jupiter:${libs.versions.junitJupiter.get()}"
+    testImplementation "org.assertj:assertj-core:${libs.versions.assertj.get()}"
+    testImplementation "org.mockito:mockito-junit-jupiter:${libs.versions.mockito.get()}"
+}

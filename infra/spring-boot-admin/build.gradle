@@ -1,0 +1,14 @@
+plugins {
+    id 'goose.spring-boot-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'Spring Boot Admin server — operator dashboard for the three Goose services.'
+
+springBoot {
+    mainClass = 'com.typedgoose.sba.SpringBootAdminApplication'
+}
+
+dependencies {
+    implementation libs.spring.boot.admin.starter.server
+}

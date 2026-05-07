@@ -1,0 +1,6 @@
+plugins {
+    id 'goose.java-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'OpenAI implementation of ChatProvider (Spring AI) + BatchProvider (openai-java SDK). Empty in Step 1.'

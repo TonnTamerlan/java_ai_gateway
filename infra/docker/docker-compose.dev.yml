@@ -1,0 +1,19 @@
+# Override for hot-reload development.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Step 1 only swaps the frontend container for a Vite dev server pointed at
+# the host-built API service. Backend live-reload comes in later steps.
+
+services:
+  frontend:
+    image: node:22-alpine
+    working_dir: /workspace/apps/frontend
+    command: sh -c "corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install && pnpm dev --host 0.0.0.0"
+    volumes:
+      - ../../apps/frontend:/workspace/apps/frontend
+      - frontend-node-modules:/workspace/apps/frontend/node_modules
+    ports:
+      - "5173:5173"
+
+volumes:
+  frontend-node-modules:

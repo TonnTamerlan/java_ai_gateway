@@ -1,0 +1,31 @@
+pluginManagement {
+    includeBuild 'build-logic'
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.9.0'
+}
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven { url 'https://repo.spring.io/milestone' }
+    }
+}
+
+rootProject.name = 'goose'
+
+include 'services:shared-contracts'
+include 'services:ai-gateway:core'
+include 'services:ai-gateway:provider-openai'
+include 'services:api-service'
+include 'services:calculation-service'
+include 'infra:spring-boot-admin'
+
+project(':services:ai-gateway:core').name = 'ai-gateway-core'
+project(':services:ai-gateway:provider-openai').name = 'ai-gateway-provider-openai'
+project(':infra:spring-boot-admin').name = 'spring-boot-admin'

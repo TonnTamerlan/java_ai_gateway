@@ -1,0 +1,16 @@
+plugins {
+    id 'goose.spring-boot-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'Calculation Service — emulates heavy work, consults AI Gateway via Kafka.'
+
+springBoot {
+    mainClass = 'com.typedgoose.calc.CalculationServiceApplication'
+}
+
+dependencies {
+    implementation project(':services:shared-contracts')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation libs.spring.boot.admin.starter.client
+}

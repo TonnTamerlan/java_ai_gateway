@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: calculation-service
+  boot:
+    admin:
+      client:
+        url: ${SPRING_BOOT_ADMIN_URL:http://localhost:9000}
+        instance:
+          service-base-url: ${SERVICE_BASE_URL:http://localhost:8082}
+
+server:
+  port: 8082
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,loggers,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: Calculation Service — async heavy-work emulator

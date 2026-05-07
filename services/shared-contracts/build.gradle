@@ -1,0 +1,6 @@
+plugins {
+    id 'goose.java-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'Domain interfaces, DTOs, Kafka envelopes (intentionally empty in Step 1).'

@@ -1,0 +1,3 @@
+# Empty in Step 1. Per-service Flyway migrations will create schemas/tables
+# starting in Step 4. The Postgres container boots with the default `goose` DB
+# and that's it.

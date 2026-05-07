@@ -1,0 +1,7 @@
+// Root project — applies no plugins itself. All real wiring lives in build-logic
+// convention plugins applied per subproject.
+
+allprojects {
+    group = 'com.typedgoose'
+    version = '0.1.0-SNAPSHOT'
+}
