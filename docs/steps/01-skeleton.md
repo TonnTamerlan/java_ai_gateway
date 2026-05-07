@@ -45,6 +45,22 @@ open http://localhost:16686                              # Jaeger (no traces yet
 - No Kafka topics created or consumed — Step 7.
 - ELK / Jaeger / SBA are wired infrastructure-wise but no logs are flowing yet (services log to stdout); the dual-appender + MDC discipline lights up in Step 11.
 
+## Deviations from the original plan (recorded for future steps)
+
+These came up during Step 1 implementation; each is small, isolated, and called out so a fresh session knows what's load-bearing.
+
+- **api-service uses `spring-boot-starter-web` (MVC)**, not WebFlux as D5 specified. Reason: Spring Boot Admin 4.0.0's auto-configured `RegistrationClient` requires `RestTemplateBuilder` and refuses to start under pure WebFlux. Step 4 must either reintroduce WebFlux + provide an explicit `ReactiveRegistrationClient`, or stay on MVC and use `SseEmitter` for chat streaming. (Carry-over note already in `docs/steps/04-api-service-chat.md`.)
+- **Docker builder base `eclipse-temurin:21-jdk`** for service images, not `:25-jdk`. Reason: Gradle 8.14.3's bundled Groovy can't re-parse Java 25 bytecode (`major version 69`) when build-logic compiles to Java 25. The toolchain still provisions Java 25 via Foojay during the build; the runtime stage stays on `eclipse-temurin:25-jre`. Service jars run on Java 25.
+- **Per-service Gradle cache id** in each Dockerfile (`--mount=type=cache,id=gradle-<service>,target=/root/.gradle`). Without per-service ids, the four parallel docker builds collide on `/root/.gradle/caches/journal-1/journal-1.lock`.
+- **`build-logic` pins `sourceCompatibility = targetCompatibility = 17`.** Defensive belt-and-suspenders against the same major-version-69 issue.
+- **`apt-get install curl` in every service runtime stage.** `eclipse-temurin:25-jre` is Ubuntu 24.04 minimal — no `wget` and no `curl`. Healthchecks all use `curl -fsS http://.../actuator/health | grep -q '"UP"'`.
+- **Kafka image: `apache/kafka:3.8.0`** (Bitnami images are no longer published to Docker Hub free tier; the `bitnami/kafka:3.x` tag is gone). Env vars switched from `KAFKA_CFG_*` (Bitnami) to plain `KAFKA_*` (Apache). `CLUSTER_ID` is fixed.
+- **Jaeger image: `jaegertracing/all-in-one:1.60`** — `:1.61` and `:1.62` are not on Docker Hub.
+- **Logstash host port: 5044** (`5044:5000`). macOS reserves 5000 for AirPlay Receiver. In-network services still talk to `logstash:5000`; the host-side mapping is a debugging convenience only.
+- **nginx listens on both IPv4 and IPv6** (`listen 80; listen [::]:80;`). Without IPv6, the alpine container's healthcheck `wget http://localhost/` resolves to `::1` first and gets `connection refused`.
+- **nginx `/api/` proxy strips the prefix** via the trailing slash on `proxy_pass http://api_service/;`. The SSE-safe location uses `rewrite ^/api/(.*/stream)$ /$1 break;`-style routing. So `/api/actuator/health` correctly reaches `/actuator/health` on api-service.
+- **Spring Boot version stayed at 4.0.0** (Java 25 toolchain works with this combo).
+
 ## Hand-off to next session
 
 Open `docs/steps/02-shared-contracts.md`. Run the brainstorming skill against it with the user; produce its detailed plan; implement; mark Step 2 done in `CHANGELOG.md`.

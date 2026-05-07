@@ -11,6 +11,10 @@ springBoot {
 
 dependencies {
     implementation project(':services:shared-contracts')
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    // Step 1: spring-boot-starter-web for the skeleton — Spring Boot Admin 4.0.0
+    // can't currently configure a RegistrationClient against pure WebFlux on the
+    // classpath. Step 4 will swap this to spring-boot-starter-webflux when the
+    // SSE chat endpoint is introduced (and provide an explicit ReactiveRegistrationClient).
+    implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation libs.spring.boot.admin.starter.client
 }

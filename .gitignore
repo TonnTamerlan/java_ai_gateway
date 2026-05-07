@@ -16,6 +16,7 @@ node_modules/
 dist/
 .pnpm-store/
 coverage/
+*.tsbuildinfo
 
 # Local environment
 .env
@@ -29,3 +30,6 @@ infra/docker/.env
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code local state
+.claude/

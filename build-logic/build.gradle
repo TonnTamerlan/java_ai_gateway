@@ -2,6 +2,15 @@ plugins {
     id 'groovy-gradle-plugin'
 }
 
+// Pin build-logic bytecode to a level any modern Gradle daemon can re-parse.
+// The Gradle daemon's Groovy compiler chokes on its own output if we let
+// build-logic target Java 25 (major 69) — the daemon may run on a newer JVM
+// (e.g. inside the docker build stage) but Gradle's bundled Groovy is older.
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 dependencies {
     implementation "org.springframework.boot:spring-boot-gradle-plugin:${libs.versions.springBoot.get()}"
     implementation "io.spring.gradle:dependency-management-plugin:${libs.versions.springDependencyManagement.get()}"
