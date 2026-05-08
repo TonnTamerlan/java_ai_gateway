@@ -1,0 +1,2 @@
+# SessionEnd hook drops <UTC-ts>-<sid>.jsonl + sibling .md here.
+# This file is just to keep the directory in git when empty.

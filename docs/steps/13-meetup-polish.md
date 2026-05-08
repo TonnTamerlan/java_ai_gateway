@@ -7,6 +7,7 @@
 
 Tighten the demo for a 30–45 minute talk.
 
+- **Mine `presentation/sessions/log.md`** (curated notes, accumulated by `/save-meetup-note` across all prior sessions) and `presentation/sessions/raw/*.jsonl` (full transcripts dropped by the SessionEnd hook). These are the primary inputs to the talk; nothing in this step starts from a blank page.
 - Talk outline in `docs/meetup/outline.md`.
 - Architecture and sequence diagrams refined; SVG exports.
 - Recorded screen flow (chat round-trip + calc round-trip).

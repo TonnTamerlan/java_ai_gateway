@@ -23,6 +23,9 @@ This is **not** a user manual. It tells future Claude Code sessions how to work 
 | `docs/adr/` | One ADR per `D-decision`. Append; supersede; do not rewrite. |
 | `docs/steps/` | Per-step plans + handoff. `CHANGELOG.md` is the cross-session log. |
 | `docs/diagrams/` | `.mmd` mermaid sources. |
+| `presentation/` | Meet-up talk raw material. `sessions/log.md` is curated; `sessions/raw/` is hook-autosaved. |
+| `.claude/commands/save-meetup-note.md` | Project-scoped slash command — invoke as `/save-meetup-note`. |
+| `.claude/settings.json` | SessionEnd hook config (autosaves raw transcript on `/clear` and `/exit`). |
 
 ## Decisions
 
@@ -55,6 +58,11 @@ docker compose -f infra/docker/docker-compose.yml down -v
 docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.dev.yml up
 ```
 
+```text
+# Capture meet-up material — run any time something demo-worthy happens:
+/save-meetup-note [optional headline]
+```
+
 Local copy of `infra/docker/.env` is required (any value for `OPENAI_API_KEY`); `.env.example` is the template. `infra/docker/.env` is gitignored.
 
 ## Conventions
@@ -70,6 +78,7 @@ Local copy of `infra/docker/.env` is required (any value for `OPENAI_API_KEY`); 
 
 ## Cross-session workflow
 
+0. **Whenever something demo-worthy happens** — a non-obvious decision, an aha moment, a snippet worth showing on stage — run `/save-meetup-note` to append a curated entry to `presentation/sessions/log.md`. The SessionEnd hook autosaves the full raw transcript on `/clear` and `/exit` as a fallback, but the curated log is what ends up in the talk.
 1. Open the lowest-numbered un-completed `docs/steps/NN-*.md`.
 2. Run the brainstorming skill on it with the user; produce that step's detailed plan.
 3. Implement. Keep `./gradlew build`, `pnpm -C apps/frontend test+build`, and `docker compose up --wait` green at every commit.

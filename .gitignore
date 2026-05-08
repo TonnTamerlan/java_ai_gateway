@@ -31,5 +31,8 @@ infra/docker/.env
 .DS_Store
 Thumbs.db
 
-# Claude Code local state
-.claude/
+# Claude Code local state — keep committed assets, ignore the rest
+.claude/*
+!.claude/commands/
+!.claude/commands/**
+!.claude/settings.json
