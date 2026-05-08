@@ -6,7 +6,8 @@ import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
 @TestPropertySource(properties = {
-        "spring.boot.admin.client.enabled=false",
+        "eureka.client.enabled=false",
+        "spring.cloud.discovery.enabled=false",
         "management.endpoints.web.exposure.include=health"
 })
 class AiGatewayApplicationTests {

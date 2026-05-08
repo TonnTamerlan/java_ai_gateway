@@ -11,10 +11,12 @@ This is **not** a user manual. It tells future Claude Code sessions how to work 
 | Path | What |
 | --- | --- |
 | `services/shared-contracts/` | Vendor-agnostic domain interfaces + Kafka envelopes. Empty in Step 1. |
-| `services/ai-gateway/{core,provider-openai}/` | AI Gateway and its OpenAI provider. |
-| `services/api-service/` | Frontend BFF (WebFlux). |
-| `services/calculation-service/` | Async heavy-work emulator. |
-| `infra/spring-boot-admin/` | Tiny Spring Boot Admin server (Gradle subproject). |
+| `services/ai-gateway/{core,provider-openai}/` | AI Gateway — stateless router/proxy to AI providers. Inbound only from chat-service (REST) and calculation-service (Kafka). |
+| `services/api-gateway/` | Edge router. Pure Spring Cloud Gateway (WebFlux, Eureka client). Routes `/api/chats/**` → `lb://chat-service`, `/api/jobs/**` → `lb://calculation-service`. |
+| `services/chat-service/` | Chat REST + SSE relay BFF. Owns the `chat` Postgres schema. WebFlux. Eureka client. |
+| `services/calculation-service/` | Async heavy-work emulator + jobs REST surface. Owns the `calc` Postgres schema. Eureka client. |
+| `infra/eureka-server/` | Netflix Eureka discovery server (port 8761). |
+| `infra/spring-boot-admin/` | Tiny Spring Boot Admin server (Gradle subproject); discovers monitored services via Eureka. |
 | `apps/frontend/` | Vite + React + TS + Ant Design. |
 | `infra/docker/` | `docker-compose.yml` + dev override + `.env.example`. |
 | `infra/{nginx,postgres,kafka,elasticsearch,kibana,jaeger,logstash}/` | Per-piece infra config. |
@@ -33,17 +35,20 @@ This is **not** a user manual. It tells future Claude Code sessions how to work 
 - **D2** Java 25 + Spring Boot 4.0 + Gradle multi-project (Groovy DSL) → [`docs/adr/0002-backend-toolchain.md`](docs/adr/0002-backend-toolchain.md)
 - **D3** ChatProvider/BatchProvider in shared-contracts; Spring AI (chat) + openai-java SDK (batch) → [`docs/adr/0003-ai-provider-abstraction.md`](docs/adr/0003-ai-provider-abstraction.md)
 - **D4** Vite + React 19 + TS + Ant Design v5 + pnpm → [`docs/adr/0004-frontend-stack.md`](docs/adr/0004-frontend-stack.md)
-- **D5** SSE for chat, polling for jobs; WebFlux throughout API Service → [`docs/adr/0005-push-channel.md`](docs/adr/0005-push-channel.md)
-- **D6** Single Postgres, three logical schemas (`app`/`calc`/`ai`), per-service Flyway → [`docs/adr/0006-postgres-data-model.md`](docs/adr/0006-postgres-data-model.md)
+- **D5** SSE for chat, polling for jobs; WebFlux throughout API Service → [`docs/adr/0005-push-channel.md`](docs/adr/0005-push-channel.md) — *partly superseded by D10*
+- **D6** Single Postgres, three logical schemas (`app`/`calc`/`ai`), per-service Flyway → [`docs/adr/0006-postgres-data-model.md`](docs/adr/0006-postgres-data-model.md) — *amended by D10: now `chat`/`calc`*
 - **D7** ES + Kibana + Logstash (TCP appender) + dual file appender; OTel → Jaeger; SBA → [`docs/adr/0007-elk-and-observability.md`](docs/adr/0007-elk-and-observability.md)
-- **D8** `services/* + apps/* + infra/* + docs/*` layout, dedicated nginx → [`docs/adr/0008-repo-layout.md`](docs/adr/0008-repo-layout.md)
+- **D8** `services/* + apps/* + infra/* + docs/*` layout, dedicated nginx → [`docs/adr/0008-repo-layout.md`](docs/adr/0008-repo-layout.md) — *amended by D10: api-gateway, chat-service, eureka-server*
 - **D9** Layered tests (unit / slice / Testcontainers / Pact); JaCoCo 80/75 from Step 6 → [`docs/adr/0009-test-strategy.md`](docs/adr/0009-test-strategy.md)
+- **D10** Eureka discovery + edge Spring Cloud Gateway + chat-service split; ai-gateway stateless → [`docs/adr/0010-discovery-and-edge-gateway.md`](docs/adr/0010-discovery-and-edge-gateway.md)
 
 ## Build / run commands
 
 ```bash
 ./gradlew build
-./gradlew :services:api-service:test
+./gradlew :services:api-gateway:test
+./gradlew :services:chat-service:test
+./gradlew :infra:eureka-server:test
 ./gradlew :services:ai-gateway:ai-gateway-core:bootJar
 
 pnpm -C apps/frontend install
@@ -91,9 +96,10 @@ Local copy of `infra/docker/.env` is required (any value for `OPENAI_API_KEY`); 
 | --- | --- |
 | Domain interfaces / Kafka envelopes | Step 2 |
 | Any OpenAI call (real or mocked) | Step 3 |
-| Any DB schema, table, or Flyway migration | Step 4 |
+| Any DB schema, table, or Flyway migration (`chat` for chat-service, `calc` for calculation-service) | Step 4-equivalent / Step 7+ |
+| Real chat REST + SSE code in chat-service | Step 4-equivalent |
 | Kafka topic creation **and** use | Step 7 |
-| OpenAI Batch API + `batch_correlations` | Step 9 |
+| OpenAI Batch API in ai-gateway | Step 9 |
 | Real ELK indexing, traces, Kibana dashboards beyond "service appears" | Step 11 |
 | Pact | Step 12 |
 

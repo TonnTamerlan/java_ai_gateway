@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant nginx
+    participant SCG as api-gateway (Spring Cloud Gateway)
+    participant Calc as calculation-service
+    participant Kafka
+    participant Gateway as ai-gateway
+    participant OpenAI
+
+    %% --- Submit a job (sync REST) ---
+    Browser->>nginx: POST /api/jobs
+    nginx->>SCG: proxy_pass
+    SCG->>Calc: lb://calculation-service /jobs (StripPrefix=1)
+    Calc-->>Browser: 202 { jobId, status: PENDING }
+
+    %% --- Async heavy work consults AI via Kafka request/reply ---
+    Calc->>Kafka: produce ai.requests { correlationId, prompt }
+    Kafka->>Gateway: consume ai.requests
+    Gateway->>OpenAI: BatchClient.submit / ChatClient.call
+    OpenAI-->>Gateway: result
+    Gateway->>Kafka: produce ai.responses { correlationId, result }
+    Kafka->>Calc: consume ai.responses (matching correlationId)
+    Calc->>Calc: persist final result, mark job DONE
+
+    %% --- Browser polls every ~1.5 s ---
+    loop until terminal
+        Browser->>nginx: GET /api/jobs/{jobId}
+        nginx->>SCG: proxy_pass
+        SCG->>Calc: lb://calculation-service /jobs/{jobId}
+        Calc-->>Browser: { status: PENDING | RUNNING | DONE | FAILED }
+    end

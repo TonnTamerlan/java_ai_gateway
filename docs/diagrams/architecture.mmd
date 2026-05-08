@@ -10,30 +10,33 @@ flowchart LR
     Browser --> Proxy
 
     subgraph svc[Spring Boot 4 / Java 25 services]
-        API[api-service :8080<br/>WebFlux]
-        Gateway[ai-gateway :8081<br/>Spring AI + openai-java SDK]
+        Gateway[api-gateway :8080<br/>Spring Cloud Gateway]
+        Chat[chat-service :8083<br/>WebFlux]
+        AI[ai-gateway :8081<br/>stateless<br/>Spring AI + openai-java SDK]
         Calc[calculation-service :8082]
+        Eureka[(eureka-server :8761)]
         SBA[spring-boot-admin :9000]
     end
 
-    Proxy --> API
-    API -- "REST + SSE" --> Gateway
-    API -- "Kafka calc.requests" --> Calc
-    Calc -- "Kafka calc.results" --> API
-    Calc -- "Kafka ai.requests / ai.responses (correlation id)" --> Gateway
-    Gateway -- "OpenAI Chat / Batch" --> OpenAI[(OpenAI)]
+    Proxy -- "/api/chats/**" --> Gateway
+    Proxy -- "/api/jobs/**" --> Gateway
+    Proxy -- "/api/health" --> Gateway
+
+    Gateway -- "lb://chat-service" --> Chat
+    Gateway -- "lb://calculation-service" --> Calc
+
+    Chat -- "REST + SSE" --> AI
+    Calc -- "Kafka ai.requests / ai.responses (correlation id)" --> AI
+    AI -- "OpenAI Chat / Batch" --> OpenAI[(OpenAI)]
 
     subgraph data[Data plane]
-        PG[(Postgres 16<br/>schemas: app · calc · ai)]
+        PG[(Postgres 16<br/>schemas: chat · calc)]
         Kafka[(Kafka KRaft<br/>topics created Step 7)]
     end
 
-    API --> PG
+    Chat --> PG
     Calc --> PG
-    Gateway --> PG
-    API --- Kafka
     Calc --- Kafka
-    Gateway --- Kafka
 
     subgraph obs[Observability]
         ES[(Elasticsearch)]
@@ -42,8 +45,13 @@ flowchart LR
         JG[Jaeger :16686]
     end
 
+    Gateway -. "register" .-> Eureka
+    Chat -. "register" .-> Eureka
+    AI -. "register" .-> Eureka
+    Calc -. "register" .-> Eureka
+    SBA -. "discover" .-> Eureka
+
     svc -. "JSON logs<br/>(Step 11)" .-> LS
     LS --> ES
     ES --> KB
     svc -. "OTLP traces<br/>(Step 11)" .-> JG
-    svc -. "register" .-> SBA

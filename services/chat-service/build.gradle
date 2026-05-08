@@ -1,0 +1,16 @@
+plugins {
+    id 'goose.spring-boot-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'Chat Service — chat REST + SSE relay BFF; calls ai-gateway over WebClient.'
+
+springBoot {
+    mainClass = 'com.typedgoose.chat.ChatServiceApplication'
+}
+
+dependencies {
+    implementation project(':services:shared-contracts')
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation libs.spring.cloud.starter.netflix.eureka.client
+}

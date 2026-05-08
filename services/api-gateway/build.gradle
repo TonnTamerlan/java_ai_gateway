@@ -1,0 +1,17 @@
+plugins {
+    id 'goose.spring-boot-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'API Gateway — Spring Cloud Gateway edge router for browser /api traffic.'
+
+springBoot {
+    mainClass = 'com.typedgoose.gateway.ApiGatewayApplication'
+}
+
+dependencies {
+    implementation project(':services:shared-contracts')
+    implementation libs.spring.cloud.starter.gateway
+    implementation libs.spring.cloud.starter.netflix.eureka.client
+    implementation libs.spring.cloud.starter.loadbalancer
+}

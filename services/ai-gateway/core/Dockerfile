@@ -6,6 +6,7 @@ COPY gradle gradle
 COPY build-logic build-logic
 COPY services services
 COPY infra/spring-boot-admin infra/spring-boot-admin
+COPY infra/eureka-server infra/eureka-server
 RUN --mount=type=cache,id=gradle-ai-gateway,target=/root/.gradle \
     ./gradlew --no-daemon :services:ai-gateway:ai-gateway-core:bootJar
 

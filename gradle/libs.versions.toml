@@ -2,6 +2,7 @@
 springBoot = "4.0.0"
 springDependencyManagement = "1.1.7"
 springBootAdmin = "4.0.0"
+springCloud = "2025.1.1"
 junitJupiter = "5.11.4"
 assertj = "3.27.0"
 mockito = "5.14.2"
@@ -9,6 +10,11 @@ mockito = "5.14.2"
 [libraries]
 spring-boot-admin-starter-client = { group = "de.codecentric", name = "spring-boot-admin-starter-client", version.ref = "springBootAdmin" }
 spring-boot-admin-starter-server = { group = "de.codecentric", name = "spring-boot-admin-starter-server", version.ref = "springBootAdmin" }
+spring-cloud-dependencies = { group = "org.springframework.cloud", name = "spring-cloud-dependencies", version.ref = "springCloud" }
+spring-cloud-starter-gateway = { group = "org.springframework.cloud", name = "spring-cloud-starter-gateway-server-webflux" }
+spring-cloud-starter-loadbalancer = { group = "org.springframework.cloud", name = "spring-cloud-starter-loadbalancer" }
+spring-cloud-starter-netflix-eureka-client = { group = "org.springframework.cloud", name = "spring-cloud-starter-netflix-eureka-client" }
+spring-cloud-starter-netflix-eureka-server = { group = "org.springframework.cloud", name = "spring-cloud-starter-netflix-eureka-server" }
 
 [plugins]
 springBoot = { id = "org.springframework.boot", version.ref = "springBoot" }

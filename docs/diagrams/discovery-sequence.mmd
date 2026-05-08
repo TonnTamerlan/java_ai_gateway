@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    participant Eureka as eureka-server
+    participant SCG as api-gateway
+    participant Chat as chat-service
+    participant AI as ai-gateway
+    participant Calc as calculation-service
+    participant SBA as spring-boot-admin
+
+    Note over Eureka: Starts first (compose depends_on healthy)
+
+    SCG->>Eureka: POST /eureka/apps/API-GATEWAY (register)
+    Chat->>Eureka: POST /eureka/apps/CHAT-SERVICE (register)
+    AI->>Eureka: POST /eureka/apps/AI-GATEWAY (register)
+    Calc->>Eureka: POST /eureka/apps/CALCULATION-SERVICE (register)
+    SBA->>Eureka: POST /eureka/apps/SPRING-BOOT-ADMIN (register)
+
+    Note over SBA,Eureka: SBA is also a discovery client — it pulls the registry instead of being pushed to.
+    SBA->>Eureka: GET /eureka/apps (discover instances)
+    Eureka-->>SBA: registry snapshot
+
+    Note over SCG,Eureka: SCG resolves lb://chat-service via Eureka at request time.
+    SCG->>Eureka: GET /eureka/apps/CHAT-SERVICE
+    Eureka-->>SCG: instance list (host:port)
+    SCG->>Chat: forward request
+
+    loop heartbeat every 30s
+        SCG->>Eureka: PUT /eureka/apps/API-GATEWAY/{instance}
+        Chat->>Eureka: PUT /eureka/apps/CHAT-SERVICE/{instance}
+        AI->>Eureka: PUT /eureka/apps/AI-GATEWAY/{instance}
+        Calc->>Eureka: PUT /eureka/apps/CALCULATION-SERVICE/{instance}
+        SBA->>Eureka: PUT /eureka/apps/SPRING-BOOT-ADMIN/{instance}
+    end

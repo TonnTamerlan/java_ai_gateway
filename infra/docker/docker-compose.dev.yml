@@ -1,8 +1,9 @@
 # Override for hot-reload development.
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
-# Step 1 only swaps the frontend container for a Vite dev server pointed at
-# the host-built API service. Backend live-reload comes in later steps.
+# This override only swaps the frontend container for a Vite dev server.
+# Vite's dev proxy forwards /api/* to localhost:8080 (the api-gateway / SCG).
+# Backend live-reload comes in later steps.
 
 services:
   frontend:

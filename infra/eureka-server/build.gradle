@@ -1,0 +1,14 @@
+plugins {
+    id 'goose.spring-boot-conventions'
+    id 'goose.testing-conventions'
+}
+
+description = 'Eureka discovery server — service registry for Goose Java services.'
+
+springBoot {
+    mainClass = 'com.typedgoose.eureka.EurekaServerApplication'
+}
+
+dependencies {
+    implementation libs.spring.cloud.starter.netflix.eureka.server
+}

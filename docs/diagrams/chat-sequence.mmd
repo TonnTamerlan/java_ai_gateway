@@ -2,20 +2,23 @@ sequenceDiagram
     autonumber
     participant Browser
     participant nginx
-    participant API as api-service (WebFlux)
+    participant SCG as api-gateway (Spring Cloud Gateway)
+    participant Chat as chat-service (WebFlux)
     participant Gateway as ai-gateway
     participant OpenAI
 
     Browser->>nginx: GET /api/chats/{id}/stream (EventSource)
-    nginx->>API: proxy_pass (proxy_buffering off)
-    API->>Gateway: GET /v1/chat/stream (Spring WebClient SSE)
+    nginx->>SCG: proxy_pass (proxy_buffering off)
+    SCG->>Chat: lb://chat-service /chats/{id}/stream (StripPrefix=1)
+    Chat->>Gateway: GET /v1/chat/stream (Spring WebClient SSE)
     Gateway->>OpenAI: ChatClient.stream(...)
     loop for each token
         OpenAI-->>Gateway: SSE: {"delta":"…"}
-        Gateway-->>API: SSE: ChatChunk
-        API-->>nginx: SSE: ChatChunk
+        Gateway-->>Chat: SSE: ChatChunk
+        Chat-->>SCG: SSE: ChatChunk
+        SCG-->>nginx: SSE: ChatChunk
         nginx-->>Browser: SSE: ChatChunk
     end
     OpenAI-->>Gateway: SSE: [DONE]
-    Gateway-->>API: complete
-    API-->>Browser: SSE: end
+    Gateway-->>Chat: complete
+    Chat-->>Browser: SSE: end

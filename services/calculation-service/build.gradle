@@ -12,5 +12,5 @@ springBoot {
 dependencies {
     implementation project(':services:shared-contracts')
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation libs.spring.boot.admin.starter.client
+    implementation libs.spring.cloud.starter.netflix.eureka.client
 }

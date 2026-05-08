@@ -11,4 +11,5 @@ springBoot {
 
 dependencies {
     implementation libs.spring.boot.admin.starter.server
+    implementation libs.spring.cloud.starter.netflix.eureka.client
 }
