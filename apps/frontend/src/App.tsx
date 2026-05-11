@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, Layout, Space, Tag, Typography } from 'antd';
+import ChatPanel from './components/ChatPanel';
 
-const { Header, Content } = Layout;
+const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
 
 type Status = 'checking' | 'up' | 'down';
@@ -54,6 +55,15 @@ export default function App() {
           </Space>
         </Card>
       </Content>
+      <Footer
+        style={{
+          padding: 16,
+          background: '#fff',
+          borderTop: '1px solid #f0f0f0',
+        }}
+      >
+        <ChatPanel />
+      </Footer>
     </Layout>
   );
 }

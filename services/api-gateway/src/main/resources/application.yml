@@ -3,22 +3,24 @@ spring:
     name: api-gateway
   cloud:
     gateway:
-      discovery:
-        locator:
-          enabled: false
-      routes:
-        - id: chat
-          uri: lb://chat-service
-          predicates:
-            - Path=/api/chats/**
-          filters:
-            - StripPrefix=1
-        - id: jobs
-          uri: lb://calculation-service
-          predicates:
-            - Path=/api/jobs/**
-          filters:
-            - StripPrefix=1
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: false
+          routes:
+            - id: chat
+              uri: lb://chat-service
+              predicates:
+                - Path=/api/chats/**
+              filters:
+                - StripPrefix=1
+            - id: jobs
+              uri: lb://calculation-service
+              predicates:
+                - Path=/api/jobs/**
+              filters:
+                - StripPrefix=1
 
 server:
   port: 8080

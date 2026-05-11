@@ -13,4 +13,6 @@ dependencies {
     implementation project(':services:shared-contracts')
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation libs.spring.cloud.starter.netflix.eureka.client
+
+    testImplementation 'org.springframework.boot:spring-boot-webflux-test'
 }
