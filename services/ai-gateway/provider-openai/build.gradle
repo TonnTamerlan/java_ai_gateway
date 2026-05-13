@@ -3,4 +3,13 @@ plugins {
     id 'goose.testing-conventions'
 }
 
-description = 'OpenAI implementation of ChatProvider (Spring AI) + BatchProvider (openai-java SDK). Empty in Step 1.'
+description = 'OpenAI implementation of ChatProvider — wraps Spring AI OpenAiChatModel behind the vendor-pure ChatProvider interface.'
+
+dependencies {
+    api project(':services:shared-contracts')
+    api platform(libs.spring.ai.bom)
+
+    api libs.spring.ai.starter.model.openai
+
+    testImplementation libs.reactor.test
+}

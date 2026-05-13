@@ -1,6 +1,6 @@
 # Step 3 — AI Gateway sync chat path
 
-**Status:** Pending.
+**Status:** Done (2026-05-12, merged with Steps 2, 4, 5).
 **Prereqs:** Step 2 green (interfaces defined).
 
 ## Scope

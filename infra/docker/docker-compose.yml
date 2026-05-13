@@ -166,6 +166,7 @@ services:
       dockerfile: services/ai-gateway/core/Dockerfile
     environment:
       EUREKA_HOST: eureka-server
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
     ports:
       - "8081:8081"
     depends_on:

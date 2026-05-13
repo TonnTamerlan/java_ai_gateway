@@ -1,9 +1,23 @@
 spring:
   application:
     name: ai-gateway
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:dummy}
+      chat:
+        options:
+          stream-usage: true
 
 server:
   port: 8081
+
+app:
+  ai:
+    provider: openai
+    models:
+      fast: gpt-4o-mini
+      medium: gpt-4o
+      slow: gpt-4-turbo
 
 eureka:
   client:

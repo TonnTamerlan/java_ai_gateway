@@ -1,6 +1,6 @@
 # Step 2 — `shared-contracts` (domain interfaces + Kafka envelopes)
 
-**Status:** Pending.
+**Status:** Done (2026-05-12, merged with Steps 3–5).
 **Prereqs:** Step 1 green.
 
 ## Scope

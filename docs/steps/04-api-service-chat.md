@@ -1,6 +1,6 @@
 # Step 4 — API Service chat plumbing + persistence
 
-**Status:** Pending.
+**Status:** Done (2026-05-12, partially — merged with Steps 2, 3, 5). Persistence + Flyway schema deferred to a later step (user explicitly asked for no DB). chat-service holds history in-memory via `ConversationStore` for now.
 **Prereqs:** Step 3 green.
 
 ## Scope

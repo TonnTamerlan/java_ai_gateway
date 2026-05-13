@@ -8,7 +8,8 @@ import org.springframework.test.context.TestPropertySource;
 @TestPropertySource(properties = {
         "eureka.client.enabled=false",
         "spring.cloud.discovery.enabled=false",
-        "management.endpoints.web.exposure.include=health"
+        "management.endpoints.web.exposure.include=health",
+        "spring.ai.openai.api-key=test"
 })
 class AiGatewayApplicationTests {
 

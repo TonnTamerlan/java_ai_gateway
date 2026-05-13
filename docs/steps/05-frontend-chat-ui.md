@@ -1,6 +1,6 @@
 # Step 5 — Frontend chat UI
 
-**Status:** Pending.
+**Status:** Done (2026-05-12, partially — merged with Steps 2–4). Router, `/chat/:id` routes, TanStack Query, MSW stubs, and cancellation UX deferred. ChatPanel now streams SSE via `fetch` + `ReadableStream` (not `EventSource`, since POST + body is required) with a model-tier `Select`; per-conversation history lives in chat-service memory.
 **Prereqs:** Step 4 green.
 
 ## Scope

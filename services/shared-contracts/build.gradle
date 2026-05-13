@@ -3,4 +3,11 @@ plugins {
     id 'goose.testing-conventions'
 }
 
-description = 'Domain interfaces, DTOs, Kafka envelopes (intentionally empty in Step 1).'
+description = 'Domain interfaces and DTOs shared between services — vendor-pure (no Spring AI, no provider SDKs).'
+
+dependencies {
+    api libs.reactor.core
+    api libs.jackson.annotations
+
+    testImplementation libs.jackson.databind
+}

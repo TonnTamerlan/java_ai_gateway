@@ -5,6 +5,10 @@ spring:
     gateway:
       server:
         webflux:
+          httpclient:
+            response-timeout: 120s
+            connect-timeout: 5000
+            compression: false   # gzip on SSE breaks token-level flushing
           discovery:
             locator:
               enabled: false

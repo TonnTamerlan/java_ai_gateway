@@ -1,9 +1,17 @@
 spring:
   application:
     name: chat-service
+  codec:
+    max-in-memory-size: 1MB
 
 server:
   port: 8083
+
+app:
+  chat:
+    system-prompt: "You are a helpful assistant. Be concise."
+  ai-gateway:
+    base-url: lb://ai-gateway
 
 eureka:
   client:

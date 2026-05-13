@@ -1,4 +1,6 @@
 package com.typedgoose.chat.api;
 
-public record MessageRequest(String message) {
+import com.typedgoose.contracts.ai.ModelTier;
+
+public record MessageRequest(String conversationId, ModelTier model, String message) {
 }
