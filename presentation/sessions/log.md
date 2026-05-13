@@ -169,3 +169,39 @@ _The "wire it to OpenAI" session. Four planned step files (2–5) collapsed into
 7. Close with the stack-tax beat: pull up `gradle/libs.versions.toml`, point at `springAi = "2.0.0-SNAPSHOT"`, `jackson-annotations 2.20` next to `jackson-databind 3.0.2`, then show the one-line `chatModel: OpenAiChatModel → ChatModel` diff that's both a Mockito workaround **and** the cleaner architecture.
 
 ---
+
+## 2026-05-13 — A 5-line Lombok refactor surfaces two silent failures
+_The change was trivial: drop `@Slf4j` + `@RequiredArgsConstructor` onto three classes. The interesting part is the two things that broke quietly along the way — both of which any Spring + Gradle team will hit eventually. **Lombok's default copyable-annotations list does not include Spring's `@Value`**, and **Gradle's build cache happily serves stale `.class` files when only `lombok.config` changed**. Together: the "fix" appeared to not fix anything for one whole rebuild cycle._
+
+### Built / fixed
+- **Lombok 1.18.46 wired in via the base convention plugin** — one `dependencies { compileOnly + annotationProcessor }` block in `build-logic/src/main/groovy/goose.java-conventions.gradle`, propagates to all 9 modules. Version pinned in `gradle/libs.versions.toml`; consumed in Groovy as `libs.versions.lombok.get()` to match the existing testing-conventions style.
+- **`lombok.config` at repo root** — `config.stopBubbling = true` and `lombok.copyableAnnotations += org.springframework.beans.factory.annotation.Value`. Two lines, but the second one is the entire point.
+- **3 classes refactored** — `services/ai-gateway/core/.../api/ChatController.java`, `services/ai-gateway/provider-openai/.../OpenAiChatProvider.java`, `services/chat-service/.../api/ChatController.java`. SLF4J logger fields gone, explicit constructors gone; `chat-service` moves `@Value("${app.chat.system-prompt}")` from a constructor parameter to the `final` field.
+- **`docs/steps/CHANGELOG.md`** entry; committed as `e9e5571` on `main`.
+
+### Decisions and trade-offs
+- **Apply via base convention plugin, not per-module.** Three classes today, but more services are coming (calculation-service still empty). Adding `compileOnly` once at the root means every future Boot service gets Lombok for free.
+- **Main sources only — no `testCompileOnly`/`testAnnotationProcessor`.** Existing test fixtures don't have boilerplate worth replacing, and Lombok-in-tests tends to obscure intent. Trivial to add later if it changes.
+- **Records left alone.** DTOs are already records (`ChatChunk`, `ChatMessage`, `ChatStreamRequest`, `Usage`, `MessageRequest`, `ModelTierProperties`). Replacing a record with `@Data` would be a regression — records get accessors/equals/hashCode/toString from the language, no annotation processor required.
+- **Pinned 1.18.46.** Lombok added JDK25 support in 1.18.40 (Sept 2025). Older versions compile, but newer language features in source code might silently bypass the processor.
+
+### Surprises / aha moments
+- **Spring's `@Value` is NOT in Lombok's default copyable-annotations list.** `@Qualifier` is. `@NonNull` is. JSpecify, Checker, FindBugs nullability annotations all are. But `org.springframework.beans.factory.annotation.Value` — the one annotation every Spring developer will reach for with `@RequiredArgsConstructor` — is not. Symptom: `NoSuchBeanDefinitionException: No qualifying bean of type 'java.lang.String' available… Dependency annotations: {}`. Spring sees an unannotated `String` constructor parameter and tries to autowire by type. _Stage cue: `javap -v ChatController.class | grep -A2 "RuntimeVisibleParameterAnnotations"` before vs. after the `lombok.config` line — the parameter goes from zero annotations to one._
+- **Gradle's build cache serves stale `.class` files when only `lombok.config` changes.** The cache key for `compileJava` hashes source files + classpath + compiler args. The `lombok.config` file is read by the annotation processor at compile time but is invisible to Gradle's cache key. Symptom: change `lombok.config`, rerun `./gradlew test` — 7 tests fail with the same error. `./gradlew clean test` — same 7 fail (clean only nukes the local `build/` dir; the cache still has the old `.class`). Fix: `./gradlew clean test --no-build-cache --rerun-tasks`. _Stage cue: a three-step terminal demo. Edit lombok.config, `./gradlew test` → fail, `clean test` → still fail, `clean test --no-build-cache --rerun-tasks` → pass. Same source code each time._
+- **The 7-failures-same-stack pattern reads like one bug; it's actually two.** First green→red was Spring `@Value` not copying. After adding `lombok.config`, it was Gradle caching. From the test output they look identical (`NoSuchBeanDefinitionException`, all 7 chat-service tests, identical stack). Easy to assume the lombok.config change didn't work and try a different annotation. The diagnostic that broke the loop: `javap -v` on the cached `.class` file showed the `@Generated` annotation present (Lombok ran) but no parameter annotations (config not picked up by the run that produced the cached artifact).
+
+### Code worth showing
+- `lombok.config` (2 lines) — `config.stopBubbling = true` + `lombok.copyableAnnotations += org.springframework.beans.factory.annotation.Value`. The whole fix.
+- `build-logic/src/main/groovy/goose.java-conventions.gradle:18-21` — five lines that opt every current and future module into Lombok. The `libs.versions.lombok.get()` Groovy interpolation is the version-catalog access pattern that already existed for JUnit/AssertJ/Mockito.
+- `services/chat-service/src/main/java/com/typedgoose/chat/api/ChatController.java:24-35` — `@RequiredArgsConstructor` + `@Slf4j` on the class, `@Value` on the field. Diff against the prior 17-line explicit constructor is the cleanest visual proof of what Lombok buys.
+- The `e9e5571` commit diff overall — `7 files changed, 24 insertions(+), 29 deletions(-)`. Negative line count is the slide.
+
+### Demo flow this session enables
+1. `git show e9e5571 --stat` — 7 files, net −5 lines. Open with the "Lombok netted us five fewer lines, what was hard?" hook.
+2. `git show e9e5571 -- services/chat-service/src/main/java/com/typedgoose/chat/api/ChatController.java` — show the constructor disappearing and `@Value` moving from parameter to field.
+3. Pull up the failing test report from the first run (or rerun locally without `lombok.config` to reproduce). Read the message: `Dependency annotations: {}`. Ask the audience to guess.
+4. Reveal `lombok.config` and the copyable-annotations line. Open Lombok's docs page on `lombok.copyableAnnotations`. Point out: `@Qualifier` is in the default list, `@Value` is not. No technical reason — it's just a curated default.
+5. The Gradle-cache beat: edit `lombok.config`, run `./gradlew test`, watch it fail. Run `./gradlew clean test`, watch it still fail. Run `./gradlew clean test --no-build-cache --rerun-tasks`, watch it pass. Same source, three runs, only the cache flags changed.
+6. Close on the diagnostic: `javap -v` on the cached `.class` file. The `@Generated` annotation proves Lombok ran. The empty parameter-annotation table proves `lombok.config` wasn't applied. That's the moment the two bugs separate.
+
+---
