@@ -111,6 +111,28 @@ services:
       retries: 30
     networks: [goose]
 
+  # One-shot: imports the saved-objects bundle (data view + saved search) into Kibana,
+  # then exits. `restart: no` keeps it from looping; `compose up --wait` is happy with
+  # a completed one-shot.
+  kibana-init:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      kibana:
+        condition: service_healthy
+    volumes:
+      - ../kibana:/seed:ro
+    command:
+      - "-fsS"
+      - "-X"
+      - "POST"
+      - "http://kibana:5601/api/saved_objects/_import?overwrite=true"
+      - "-H"
+      - "kbn-xsrf: true"
+      - "--form"
+      - "file=@/seed/saved-objects.ndjson"
+    restart: "no"
+    networks: [goose]
+
   jaeger:
     image: jaegertracing/all-in-one:1.60
     environment:
@@ -131,6 +153,8 @@ services:
     build:
       context: ../..
       dockerfile: infra/eureka-server/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8761:8761"
     healthcheck:
@@ -148,6 +172,7 @@ services:
     environment:
       SERVER_PORT: 9000
       EUREKA_HOST: eureka-server
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "9000:9000"
     depends_on:
@@ -167,6 +192,7 @@ services:
     environment:
       EUREKA_HOST: eureka-server
       OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8081:8081"
     depends_on:
@@ -185,6 +211,7 @@ services:
       dockerfile: services/api-gateway/Dockerfile
     environment:
       EUREKA_HOST: eureka-server
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8080:8080"
     depends_on:
@@ -203,6 +230,7 @@ services:
       dockerfile: services/chat-service/Dockerfile
     environment:
       EUREKA_HOST: eureka-server
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8083:8083"
     depends_on:
@@ -221,6 +249,7 @@ services:
       dockerfile: services/calculation-service/Dockerfile
     environment:
       EUREKA_HOST: eureka-server
+      SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8082:8082"
     depends_on:

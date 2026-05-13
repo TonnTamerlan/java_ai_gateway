@@ -5,7 +5,6 @@ import com.typedgoose.contracts.ai.ChatChunk;
 import com.typedgoose.contracts.ai.ChatMessage;
 import com.typedgoose.contracts.ai.ChatStreamRequest;
 import com.typedgoose.contracts.ai.MessageRole;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -23,15 +22,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
 @RequestMapping("/chats")
-@RequiredArgsConstructor
 @Slf4j
 public class ChatController {
 
     private final WebClient aiGatewayClient;
     private final ConversationStore store;
-
-    @Value("${app.chat.system-prompt}")
     private final String systemPrompt;
+
+    public ChatController(WebClient aiGatewayClient,
+                          ConversationStore store,
+                          @Value("${app.chat.system-prompt}") String systemPrompt) {
+        this.aiGatewayClient = aiGatewayClient;
+        this.store = store;
+        this.systemPrompt = systemPrompt;
+    }
 
     @PostMapping(path = "/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<ChatChunk>> postMessage(@RequestBody MessageRequest request) {

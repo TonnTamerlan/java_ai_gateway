@@ -10,6 +10,7 @@ junitJupiter = "5.11.4"
 assertj = "3.27.0"
 mockito = "5.14.2"
 lombok = "1.18.46"
+logstashLogbackEncoder = "8.0"
 
 [libraries]
 spring-boot-admin-starter-client = { group = "de.codecentric", name = "spring-boot-admin-starter-client", version.ref = "springBootAdmin" }
@@ -26,6 +27,7 @@ reactor-test = { group = "io.projectreactor", name = "reactor-test", version.ref
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = "2.20" }
 jackson-databind = { group = "tools.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
+logstash-logback-encoder = { group = "net.logstash.logback", name = "logstash-logback-encoder", version.ref = "logstashLogbackEncoder" }
 
 [plugins]
 springBoot = { id = "org.springframework.boot", version.ref = "springBoot" }

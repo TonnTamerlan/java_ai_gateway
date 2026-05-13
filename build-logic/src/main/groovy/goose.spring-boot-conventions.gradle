@@ -12,5 +12,6 @@ dependencyManagement {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation libs.logstash.logback.encoder
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
