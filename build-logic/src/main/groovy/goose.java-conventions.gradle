@@ -15,6 +15,11 @@ repositories {
     maven { url 'https://repo.spring.io/snapshot' }
 }
 
+dependencies {
+    compileOnly "org.projectlombok:lombok:${libs.versions.lombok.get()}"
+    annotationProcessor "org.projectlombok:lombok:${libs.versions.lombok.get()}"
+}
+
 tasks.named('test', Test) {
     useJUnitPlatform()
     testLogging {

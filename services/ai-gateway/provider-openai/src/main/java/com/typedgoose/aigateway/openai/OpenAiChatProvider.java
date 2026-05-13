@@ -5,8 +5,8 @@ import com.typedgoose.contracts.ai.ChatMessage;
 import com.typedgoose.contracts.ai.ChatProvider;
 import com.typedgoose.contracts.ai.ChatStreamRequest;
 import com.typedgoose.contracts.ai.Usage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -21,17 +21,12 @@ import reactor.core.publisher.Flux;
 import java.util.ArrayList;
 import java.util.List;
 
+@RequiredArgsConstructor
+@Slf4j
 public class OpenAiChatProvider implements ChatProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(OpenAiChatProvider.class);
 
     private final ChatModel chatModel;
     private final ModelTierMapper modelTierMapper;
-
-    public OpenAiChatProvider(ChatModel chatModel, ModelTierMapper modelTierMapper) {
-        this.chatModel = chatModel;
-        this.modelTierMapper = modelTierMapper;
-    }
 
     @Override
     public Flux<ChatChunk> stream(ChatStreamRequest request) {

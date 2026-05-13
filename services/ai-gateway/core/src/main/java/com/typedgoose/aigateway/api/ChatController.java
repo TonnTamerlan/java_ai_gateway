@@ -3,8 +3,8 @@ package com.typedgoose.aigateway.api;
 import com.typedgoose.contracts.ai.ChatChunk;
 import com.typedgoose.contracts.ai.ChatProvider;
 import com.typedgoose.contracts.ai.ChatStreamRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,15 +18,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @RestController
 @RequestMapping("/v1/chat")
+@RequiredArgsConstructor
+@Slf4j
 public class ChatController {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
-
     private final ChatProvider chatProvider;
-
-    public ChatController(ChatProvider chatProvider) {
-        this.chatProvider = chatProvider;
-    }
 
     @PostMapping(path = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<ChatChunk>> stream(@RequestBody ChatStreamRequest request) {
