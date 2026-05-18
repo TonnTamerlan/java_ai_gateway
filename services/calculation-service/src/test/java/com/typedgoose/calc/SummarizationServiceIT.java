@@ -93,7 +93,7 @@ class SummarizationServiceIT {
         assertThat(job.status()).isEqualTo(JobStatus.PENDING);
         assertThat(job.fileCount()).isEqualTo(3);
 
-        List<SummarizationFile> rows = files.findByJobId(job.id());
+        List<SummarizationFile> rows = files.findByJobIdOrderByCreatedAt(job.id());
         assertThat(rows).hasSize(3);
         assertThat(rows).allSatisfy(row -> {
             assertThat(row.status()).isEqualTo(FileStatus.PENDING);

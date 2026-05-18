@@ -33,6 +33,7 @@ jackson-databind = { group = "tools.jackson.core", name = "jackson-databind", ve
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 logstash-logback-encoder = { group = "net.logstash.logback", name = "logstash-logback-encoder", version.ref = "logstashLogbackEncoder" }
 spring-boot-starter-jdbc = { group = "org.springframework.boot", name = "spring-boot-starter-jdbc" }
+spring-boot-starter-data-jdbc = { group = "org.springframework.boot", name = "spring-boot-starter-data-jdbc" }
 spring-kafka = { group = "org.springframework.kafka", name = "spring-kafka" }
 spring-kafka-test = { group = "org.springframework.kafka", name = "spring-kafka-test" }
 flyway-core = { group = "org.flywaydb", name = "flyway-core", version.ref = "flyway" }

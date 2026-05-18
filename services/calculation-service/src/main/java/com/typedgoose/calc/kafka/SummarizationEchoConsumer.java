@@ -67,7 +67,7 @@ public class SummarizationEchoConsumer {
     }
 
     private void rollUpJob(UUID jobId, Instant now) {
-        List<SummarizationFile> rows = files.findByJobId(jobId);
+        List<SummarizationFile> rows = files.findByJobIdOrderByCreatedAt(jobId);
         if (rows.isEmpty()) return;
 
         boolean allTerminal = rows.stream().allMatch(r ->

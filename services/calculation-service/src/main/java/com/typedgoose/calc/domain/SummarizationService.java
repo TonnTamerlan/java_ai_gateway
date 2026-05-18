@@ -29,7 +29,7 @@ public class SummarizationService {
     public SummarizeResponse submit(String prompt, List<FileInput> inputs) {
         Instant now = clock.instant();
         UUID jobId = UUID.randomUUID();
-        jobs.insert(new SummarizationJob(jobId, now, now, JobStatus.PENDING, inputs.size()));
+        jobs.save(new SummarizationJob(jobId, null, now, now, JobStatus.PENDING, inputs.size()));
 
         List<UUID> correlationIds = new ArrayList<>(inputs.size());
         List<SummarizationFile> persisted = new ArrayList<>(inputs.size());
@@ -37,6 +37,7 @@ public class SummarizationService {
             UUID correlationId = UUID.randomUUID();
             SummarizationFile file = new SummarizationFile(
                     UUID.randomUUID(),
+                    null,
                     jobId,
                     correlationId,
                     input.content(),
@@ -44,7 +45,7 @@ public class SummarizationService {
                     FileStatus.PENDING,
                     null, null, null, null, null,
                     now, now);
-            files.insert(file);
+            files.save(file);
             correlationIds.add(correlationId);
             persisted.add(file);
         }

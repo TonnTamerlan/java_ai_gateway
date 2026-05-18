@@ -81,7 +81,7 @@ public class SummarizeController {
     @GetMapping("/{jobId}")
     public ResponseEntity<JobView> get(@PathVariable UUID jobId) {
         return jobs.findById(jobId)
-                .map(job -> ResponseEntity.ok(new JobView(job, files.findByJobId(job.id()))))
+                .map(job -> ResponseEntity.ok(new JobView(job, files.findByJobIdOrderByCreatedAt(job.id()))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
