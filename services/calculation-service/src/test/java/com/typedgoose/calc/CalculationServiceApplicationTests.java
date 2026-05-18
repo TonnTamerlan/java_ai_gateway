@@ -14,7 +14,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @TestPropertySource(properties = {
         "eureka.client.enabled=false",
         "spring.cloud.discovery.enabled=false",
-        "management.endpoints.web.exposure.include=health"
+        "management.endpoints.web.exposure.include=health",
+        "calc.kafka.listener.enabled=false"
 })
 class CalculationServiceApplicationTests {
 

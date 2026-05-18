@@ -17,6 +17,7 @@ dependencies {
     implementation libs.spring.boot.starter.jdbc
     implementation 'org.springframework.boot:spring-boot-flyway'
     implementation libs.flyway.core
+    implementation libs.spring.kafka
     runtimeOnly libs.flyway.database.postgresql
     runtimeOnly libs.postgresql
 

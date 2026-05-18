@@ -10,6 +10,20 @@ spring:
     schemas: calc
     default-schema: calc
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 1MB
+      max-request-size: 12MB
+  kafka:
+    consumer:
+      group-id: calc-service
+      auto-offset-reset: earliest
+
+calc:
+  kafka:
+    listener:
+      enabled: true
 
 server:
   port: 8082

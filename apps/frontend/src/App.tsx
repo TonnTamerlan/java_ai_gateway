@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Layout, Space, Tag, Typography } from 'antd';
 import ChatPanel from './components/ChatPanel';
+import FileSummarizationPanel from './components/FileSummarizationPanel';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
@@ -35,9 +36,10 @@ export default function App() {
       <Content
         style={{
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
           padding: 24,
+          gap: 16,
         }}
       >
         <Card style={{ minWidth: 360, textAlign: 'center' }} title="Goose is alive">
@@ -54,6 +56,7 @@ export default function App() {
             </Space>
           </Space>
         </Card>
+        <FileSummarizationPanel />
       </Content>
       <Footer
         style={{

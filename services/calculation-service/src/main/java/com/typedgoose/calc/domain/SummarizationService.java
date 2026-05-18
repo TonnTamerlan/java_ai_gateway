@@ -1,7 +1,6 @@
 package com.typedgoose.calc.domain;
 
 import com.typedgoose.calc.api.FileInput;
-import com.typedgoose.calc.api.SummarizeRequest;
 import com.typedgoose.calc.api.SummarizeResponse;
 import com.typedgoose.calc.db.FilesRepository;
 import com.typedgoose.calc.db.JobsRepository;
@@ -27,21 +26,21 @@ public class SummarizationService {
     private final Clock clock;
 
     @Transactional
-    public SummarizeResponse submit(SummarizeRequest request) {
+    public SummarizeResponse submit(String prompt, List<FileInput> inputs) {
         Instant now = clock.instant();
         UUID jobId = UUID.randomUUID();
-        jobs.insert(new SummarizationJob(jobId, now, now, JobStatus.PENDING, request.files().size()));
+        jobs.insert(new SummarizationJob(jobId, now, now, JobStatus.PENDING, inputs.size()));
 
-        List<UUID> correlationIds = new ArrayList<>(request.files().size());
-        List<SummarizationFile> persisted = new ArrayList<>(request.files().size());
-        for (FileInput input : request.files()) {
+        List<UUID> correlationIds = new ArrayList<>(inputs.size());
+        List<SummarizationFile> persisted = new ArrayList<>(inputs.size());
+        for (FileInput input : inputs) {
             UUID correlationId = UUID.randomUUID();
             SummarizationFile file = new SummarizationFile(
                     UUID.randomUUID(),
                     jobId,
                     correlationId,
                     input.content(),
-                    input.instruction(),
+                    prompt,
                     FileStatus.PENDING,
                     null, null, null, null, null,
                     now, now);
@@ -50,11 +49,11 @@ public class SummarizationService {
             persisted.add(file);
         }
 
-        // Publish AFTER the transaction commits would be safer once the broker is wired (Step 08).
-        // For the no-op Step-07 publisher there is no transactional concern; we publish in-band.
+        // Publishing in-band is fine for the echo consumer; once a real broker is wired
+        // a TransactionSynchronization callback would defer it past commit.
         persisted.forEach(publisher::publish);
 
-        log.info("summarization job submitted jobId={} fileCount={}", jobId, request.files().size());
+        log.info("summarization job submitted jobId={} fileCount={}", jobId, inputs.size());
         return new SummarizeResponse(jobId, correlationIds);
     }
 }
