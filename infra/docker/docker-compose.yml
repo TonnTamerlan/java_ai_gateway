@@ -250,10 +250,15 @@ services:
     environment:
       EUREKA_HOST: eureka-server
       SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/goose
+      DB_USER: goose
+      DB_PASSWORD: goose
     ports:
       - "8082:8082"
     depends_on:
       eureka-server:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health | grep -q '\"UP\"' || exit 1"]

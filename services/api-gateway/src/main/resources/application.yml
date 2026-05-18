@@ -25,6 +25,12 @@ spring:
                 - Path=/api/jobs/**
               filters:
                 - StripPrefix=1
+            - id: summarize
+              uri: lb://calculation-service
+              predicates:
+                - Path=/api/summarize/**
+              filters:
+                - StripPrefix=1
 
 server:
   port: 8080

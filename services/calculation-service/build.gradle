@@ -12,5 +12,16 @@ springBoot {
 dependencies {
     implementation project(':services:shared-contracts')
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation libs.spring.cloud.starter.netflix.eureka.client
+    implementation libs.spring.boot.starter.jdbc
+    implementation 'org.springframework.boot:spring-boot-flyway'
+    implementation libs.flyway.core
+    runtimeOnly libs.flyway.database.postgresql
+    runtimeOnly libs.postgresql
+
+    testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
+    testImplementation libs.testcontainers.postgresql
+    testImplementation libs.testcontainers.junit.jupiter
+    testImplementation libs.awaitility
 }

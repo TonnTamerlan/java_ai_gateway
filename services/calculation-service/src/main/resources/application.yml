@@ -1,6 +1,15 @@
 spring:
   application:
     name: calculation-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/goose}
+    username: ${DB_USER:goose}
+    password: ${DB_PASSWORD:goose}
+  flyway:
+    enabled: true
+    schemas: calc
+    default-schema: calc
+    locations: classpath:db/migration
 
 server:
   port: 8082
