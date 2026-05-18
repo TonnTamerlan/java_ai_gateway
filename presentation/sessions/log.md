@@ -205,3 +205,38 @@ _The change was trivial: drop `@Slf4j` + `@RequiredArgsConstructor` onto three c
 6. Close on the diagnostic: `javap -v` on the cached `.class` file. The `@Generated` annotation proves Lombok ran. The empty parameter-annotation table proves `lombok.config` wasn't applied. That's the moment the two bugs separate.
 
 ---
+
+## 2026-05-18 — JdbcTemplate → Spring Data JDBC: records as aggregates, `@Version` to dodge the existsById SELECT
+_The hand-written repo layer was small, but the migration surfaces two non-obvious facts: Spring Data JDBC materializes immutable records natively, and `@Version` doubles as a "this is new" signal that skips a SELECT round-trip per save._
+
+### Built / fixed
+- Repos became three-line interfaces: `services/calculation-service/src/main/java/com/typedgoose/calc/db/FilesRepository.java`, `…/db/JobsRepository.java`. Net diff: 11 files, **+61 / −145 lines** (commit `d31e383`).
+- Records gained `@Id` / `@Version` / `@Table(schema="calc")`: `…/domain/SummarizationFile.java`, `…/domain/SummarizationJob.java`.
+- Conditional updates stayed custom — `@Modifying @Query` with `WHERE status = 'PENDING'` to preserve idempotent replay.
+- New Flyway migration: `services/calculation-service/src/main/resources/db/migration/V2__add_version_column.sql` — `ADD COLUMN version BIGINT NOT NULL DEFAULT 0` on both tables. Verified live: applied to existing volume without a wipe (`flyway_schema_history` shows the V2 row alongside V1).
+
+### Decisions and trade-offs
+- **Records, not entities.** Spring Data JDBC reads the canonical constructor — no setters, no JPA-style proxies. The version component is just another final field. Avoided JPA / Hibernate entirely; the project's "vendor-pure aggregates" rule held.
+- **Kept `markDone` / `markFailed` / `updateStatus` as `@Modifying @Query`** rather than read-modify-`save()`. Derived queries can't express `WHERE … AND status = 'PENDING'`. The alternative (load, mutate, save) would also need optimistic-locking retry logic — three lines of SQL is cheaper and the existing idempotency tests passed unchanged.
+- **`@Version` over `Persistable<UUID>`.** Both solve "is this entity new?" for app-assigned UUIDs. `Persistable` requires a `@Transient` flag, which fights the record contract. `@Version Long` is a real DB column, costs one BIGINT per row, and the rule "null → INSERT" is a property of the record itself rather than something the caller has to remember.
+
+### Surprises / aha moments
+- **Spring Data JDBC's default new-vs-existing detection is `existsById` — i.e. a SELECT before every save.** With an externally generated UUID PK, the `@Id` field is never null, so the default heuristic ("PK is null → new") doesn't apply. Spring falls back to a pre-`save()` `SELECT 1 FROM calc.summarization_jobs WHERE id = ?` to decide whether to emit INSERT or UPDATE. **Adding `@Version` flips the signal:** null version → new (INSERT), non-null → existing (UPDATE), and the existsById SELECT is skipped entirely. Per-row cost: one less round-trip. _Stage cue: enable `logging.level.org.springframework.jdbc=DEBUG`, run a `submit` request twice — once with the `@Version` field, once with it removed — and diff the JDBC trace. The "before" run has 4 statements per file (`SELECT existsById`, then `INSERT`); the "after" has 1 (`INSERT`)._
+- **`@Modifying @Query` survives the migration.** Audience expects "Spring Data means no more SQL." The reality is more nuanced — `CrudRepository.save()` handles 80% of writes, and the other 20% (conditional UPDATEs, bulk deletes, set-based ops) drop into `@Modifying @Query` while still living in the same interface. The repo file is still 30 lines, just no `RowMapper` anymore. _Stage cue: show the `FilesRepository.java` diff side-by-side: deleted ROW_MAPPER, deleted `INSERT INTO … VALUES (?, ?, ?, …)`, but the `UPDATE … WHERE status = 'PENDING'` SQL is **still there**, now annotated with `@Modifying @Query`._
+- **Records can host `@Id` / `@Version` / `@Table` directly on the record header.** Annotation targets on `RECORD_COMPONENT` plus the existing Spring Data Relational annotations means the entity is literally one record: `record SummarizationJob(@Id UUID id, @Version Long version, Instant createdAt, …)`. No mapper class, no DTO/entity split. The "where does my domain object live?" question evaporates.
+
+### Code worth showing
+- `services/calculation-service/src/main/java/com/typedgoose/calc/db/FilesRepository.java` (whole file, 38 lines) — the entire repository surface after migration. Three derived queries, two `@Modifying @Query`, zero `RowMapper`. Diff against the 104-line JdbcTemplate version is the slide.
+- `services/calculation-service/src/main/java/com/typedgoose/calc/domain/SummarizationJob.java` (whole file, 16 lines) — one record annotated with `@Table(schema="calc", name="summarization_jobs")`, `@Id`, `@Version`. The "this is also the persistence model" reveal.
+- `services/calculation-service/src/main/resources/db/migration/V2__add_version_column.sql` (2 lines) — `ADD COLUMN version BIGINT NOT NULL DEFAULT 0` on each table. The cheapest enabling change in the diff.
+- `services/calculation-service/src/main/java/com/typedgoose/calc/domain/SummarizationService.java:32-37` — `jobs.save(new SummarizationJob(jobId, null, now, now, JobStatus.PENDING, inputs.size()))`. The literal `null` for the version slot is the "INSERT please" signal — calling it out makes the `@Version` trick concrete.
+
+### Demo flow this session enables
+1. `git show d31e383 --stat` — open with "−145 / +61, and the new migration is two lines."
+2. Side-by-side: old `FilesRepository.java` (the 104-line JdbcTemplate version) vs. new (the 38-line interface). Point at where each method went — `findByJobId` → derived query, `markDone` → `@Modifying @Query`, `insert` → inherited `save()`.
+3. Pose the question: "If I call `files.save(file)`, how does Spring Data JDBC know whether to INSERT or UPDATE?" Wait. Reveal: `existsById` SELECT round-trip. Audience groans.
+4. The `@Version` reveal: null version → new, non-null → existing. Pull up the JDBC debug log to show the SELECT is gone.
+5. Switch to the V2 migration file — two ALTER statements. Then `docker compose exec postgres psql -c "SELECT version, description, success FROM calc.flyway_schema_history;"` — shows V1 + V2 applied, on the same existing volume from prior demos. Sells the "Flyway-as-incremental-migration" story.
+6. Close on the idempotency callout: `SummarizationServiceIT.markDoneTransitionsPendingRowAndIsIdempotent` passed unchanged after the migration. The `@Modifying @Query` SQL is byte-identical to the JdbcTemplate version. Spring Data doesn't replace SQL — it absorbs the 80% case so the remaining 20% is more visible.
+
+---
