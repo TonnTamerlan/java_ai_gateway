@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface FilesRepository extends CrudRepository<SummarizationFile, UUID> {
+public interface FilesRepository extends CrudRepository<SummarizationFile, UUID>, FilesRepositoryCustom {
 
     Optional<SummarizationFile> findByCorrelationId(UUID correlationId);
 

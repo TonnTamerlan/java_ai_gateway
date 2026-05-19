@@ -13,6 +13,7 @@ public record SummarizationFile(
         @Version Long version,
         UUID jobId,
         UUID correlationId,
+        String fileName,
         String originalText,
         String instruction,
         FileStatus status,

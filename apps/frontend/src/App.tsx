@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Layout, Space, Tag, Typography } from 'antd';
 import ChatPanel from './components/ChatPanel';
 import FileSummarizationPanel from './components/FileSummarizationPanel';
+import FilesTable from './components/FilesTable';
 
 const { Header, Content, Footer } = Layout;
 const { Title, Text } = Typography;
@@ -57,6 +58,7 @@ export default function App() {
           </Space>
         </Card>
         <FileSummarizationPanel />
+        <FilesTable />
       </Content>
       <Footer
         style={{

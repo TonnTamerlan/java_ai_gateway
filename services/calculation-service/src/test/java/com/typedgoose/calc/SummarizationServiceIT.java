@@ -105,6 +105,8 @@ class SummarizationServiceIT {
         });
         assertThat(rows.stream().map(SummarizationFile::correlationId).toList())
                 .containsExactlyInAnyOrderElementsOf(response.correlationIds());
+        assertThat(rows).extracting(SummarizationFile::fileName)
+                .containsExactlyInAnyOrder("a.txt", "b.txt", "c.txt");
 
         assertThat(publishedCorrelationIds).containsExactlyInAnyOrderElementsOf(response.correlationIds());
     }

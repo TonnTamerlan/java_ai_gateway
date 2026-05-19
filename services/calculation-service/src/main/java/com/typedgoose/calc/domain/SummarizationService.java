@@ -40,6 +40,7 @@ public class SummarizationService {
                     null,
                     jobId,
                     correlationId,
+                    input.filename(),
                     input.content(),
                     prompt,
                     FileStatus.PENDING,

@@ -2,11 +2,16 @@ package com.typedgoose.calc.api;
 
 import com.typedgoose.calc.db.FilesRepository;
 import com.typedgoose.calc.db.JobsRepository;
+import com.typedgoose.calc.domain.FileStatus;
 import com.typedgoose.calc.domain.SummarizationFile;
 import com.typedgoose.calc.domain.SummarizationJob;
 import com.typedgoose.calc.domain.SummarizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -23,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -32,6 +38,8 @@ import java.util.UUID;
 public class SummarizeController {
 
     private static final int MAX_FILES = 10;
+    private static final Set<String> SORTABLE_FIELDS =
+            Set.of("fileName", "status", "createdAt", "updatedAt");
 
     private final SummarizationService service;
     private final JobsRepository jobs;
@@ -83,6 +91,25 @@ public class SummarizeController {
         return jobs.findById(jobId)
                 .map(job -> ResponseEntity.ok(new JobView(job, files.findByJobIdOrderByCreatedAt(job.id()))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/files")
+    public Page<FileSummaryView> listFiles(
+            @RequestParam(value = "status", required = false) FileStatus status,
+            @RequestParam(value = "name", required = false) String name,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+
+        pageable.getSort().forEach(order -> {
+            if (!SORTABLE_FIELDS.contains(order.getProperty())) {
+                throw new IllegalArgumentException(
+                        "sort field not allowed: " + order.getProperty()
+                                + " (allowed: " + SORTABLE_FIELDS + ")");
+            }
+        });
+
+        String trimmedName = (name == null || name.isBlank()) ? null : name.trim();
+        return files.search(status, trimmedName, pageable).map(FileSummaryView::of);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

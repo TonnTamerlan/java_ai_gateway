@@ -5,19 +5,16 @@ import {
   Input,
   Space,
   Table,
-  Tag,
   Typography,
   Upload,
   message,
   type UploadFile,
 } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
+import { statusTag, type FileStatus, type JobStatus } from './status';
 
 const { Dragger } = Upload;
 const { Text } = Typography;
-
-type FileStatus = 'PENDING' | 'DONE' | 'FAILED';
-type JobStatus = 'PENDING' | 'PARTIAL' | 'DONE' | 'FAILED';
 
 interface JobView {
   job: {
@@ -44,19 +41,6 @@ interface SubmitResponse {
 
 const MAX_FILES = 10;
 const POLL_INTERVAL_MS = 1500;
-
-function statusTag(status: FileStatus | JobStatus) {
-  switch (status) {
-    case 'DONE':
-      return <Tag color="green">{status}</Tag>;
-    case 'FAILED':
-      return <Tag color="red">{status}</Tag>;
-    case 'PARTIAL':
-      return <Tag color="orange">{status}</Tag>;
-    default:
-      return <Tag color="blue">{status}</Tag>;
-  }
-}
 
 export default function FileSummarizationPanel() {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
