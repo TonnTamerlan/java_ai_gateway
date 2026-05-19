@@ -23,5 +23,6 @@ public record SummarizationFile(
         Integer completionTokens,
         String errorMessage,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Instant deletedAt) {
 }

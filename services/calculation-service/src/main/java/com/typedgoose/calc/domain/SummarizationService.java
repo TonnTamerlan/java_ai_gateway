@@ -45,7 +45,7 @@ public class SummarizationService {
                     prompt,
                     FileStatus.PENDING,
                     null, null, null, null, null,
-                    now, now);
+                    now, now, null);
             files.save(file);
             correlationIds.add(correlationId);
             persisted.add(file);

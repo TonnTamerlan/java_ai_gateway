@@ -6,6 +6,7 @@ import com.typedgoose.calc.domain.FileStatus;
 import com.typedgoose.calc.domain.SummarizationFile;
 import com.typedgoose.calc.domain.SummarizationJob;
 import com.typedgoose.calc.domain.SummarizationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -14,10 +15,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,11 +29,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -89,7 +95,7 @@ public class SummarizeController {
     @GetMapping("/{jobId}")
     public ResponseEntity<JobView> get(@PathVariable UUID jobId) {
         return jobs.findById(jobId)
-                .map(job -> ResponseEntity.ok(new JobView(job, files.findByJobIdOrderByCreatedAt(job.id()))))
+                .map(job -> ResponseEntity.ok(new JobView(job, files.findByJobIdAndDeletedAtIsNullOrderByCreatedAt(job.id()))))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -112,10 +118,26 @@ public class SummarizeController {
         return files.search(status, trimmedName, pageable).map(FileSummaryView::of);
     }
 
+    @DeleteMapping("/files")
+    public DeleteFilesResponse deleteFiles(@Valid @RequestBody DeleteFilesRequest req) {
+        int deleted = files.softDelete(req.ids(), Instant.now());
+        log.info("soft-deleted {} files (requested {})", deleted, req.ids().size());
+        return new DeleteFilesResponse(deleted);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException ex) {
         log.info("summarize upload rejected: {}", ex.getMessage());
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, String>> handleValidationError(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getAllErrors().stream()
+                .map(e -> e.getDefaultMessage() == null ? "invalid" : e.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        log.info("validation failed: {}", message);
+        return ResponseEntity.badRequest().body(Map.of("error", message));
     }
 
     public record JobView(SummarizationJob job, List<SummarizationFile> files) {

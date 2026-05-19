@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type HTMLAttributes,
+} from 'react';
 import {
   Button,
   Card,
   Empty,
   Input,
+  Popconfirm,
   Popover,
   Select,
   Space,
@@ -13,7 +23,7 @@ import {
   type TablePaginationConfig,
 } from 'antd';
 import type { ColumnsType, SorterResult } from 'antd/es/table/interface';
-import { InfoCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import { statusTag, type FileStatus } from './status';
 
 const { Text, Paragraph } = Typography;
@@ -78,16 +88,43 @@ function StatsPopoverContent({ row }: { row: FileRow }) {
   );
 }
 
+const RowsContext = createContext<FileRow[]>([]);
+
+type HoverRowProps = HTMLAttributes<HTMLTableRowElement> & {
+  'data-row-key'?: string;
+};
+
+function HoverableRow(props: HoverRowProps) {
+  const rows = useContext(RowsContext);
+  const key = props['data-row-key'];
+  const record = key ? rows.find((r) => r.id === key) : undefined;
+  if (!record) return <tr {...props} />;
+  return (
+    <Popover
+      content={<StatsPopoverContent row={record} />}
+      title="Run stats"
+      placement="topLeft"
+      mouseEnterDelay={0.1}
+      mouseLeaveDelay={0.1}
+      trigger="hover"
+    >
+      <tr {...props} data-testid={`files-row-${record.id}`} />
+    </Popover>
+  );
+}
+
 export default function FilesTable() {
   const [data, setData] = useState<FileRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [page, setPage] = useState(0);
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [statusFilter, setStatusFilter] = useState<'ALL' | FileStatus>('ALL');
   const [nameInput, setNameInput] = useState('');
   const [nameQuery, setNameQuery] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const reqIdRef = useRef(0);
 
   useEffect(() => {
@@ -115,8 +152,15 @@ export default function FilesTable() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as Partial<PageResponse>;
       if (reqId !== reqIdRef.current) return; // a newer request superseded us
-      setData(Array.isArray(body.content) ? body.content : []);
-      setTotal(typeof body.totalElements === 'number' ? body.totalElements : 0);
+      const content = Array.isArray(body.content) ? body.content : [];
+      const totalCount = typeof body.totalElements === 'number' ? body.totalElements : 0;
+      setData(content);
+      setTotal(totalCount);
+      // If we landed on an empty page past the first, step back so the user
+      // doesn't stare at an empty table after deleting the last row.
+      if (content.length === 0 && page > 0 && totalCount > 0) {
+        setPage((p) => Math.max(0, p - 1));
+      }
     } catch (err) {
       console.error('files fetch failed', err);
       if (reqId === reqIdRef.current) {
@@ -132,6 +176,32 @@ export default function FilesTable() {
   useEffect(() => {
     void fetchPage();
   }, [fetchPage]);
+
+  const handleDelete = useCallback(async () => {
+    if (selectedKeys.length === 0) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/summarize/files', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedKeys }),
+      });
+      if (!res.ok) {
+        message.error('Delete failed');
+        await fetchPage();
+        return;
+      }
+      const { deleted } = (await res.json()) as { deleted: number };
+      message.success(`Deleted ${deleted} file(s)`);
+      setSelectedKeys([]);
+      await fetchPage();
+    } catch (err) {
+      console.error('delete failed', err);
+      message.error('Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedKeys, fetchPage]);
 
   const columns = useMemo<ColumnsType<FileRow>>(
     () => [
@@ -177,26 +247,6 @@ export default function FilesTable() {
         sorter: true,
         sortOrder: sortField === 'updatedAt' ? toAntdOrder(sortOrder) : null,
         render: (iso: string) => <Text>{formatInstant(iso)}</Text>,
-      },
-      {
-        title: '',
-        key: 'stats',
-        width: 48,
-        align: 'center',
-        render: (_: unknown, row: FileRow) => (
-          <Popover
-            content={<StatsPopoverContent row={row} />}
-            title="Run stats"
-            placement="bottomLeft"
-            mouseEnterDelay={0.2}
-            trigger={['hover', 'click']}
-          >
-            <InfoCircleOutlined
-              data-testid={`stats-icon-${row.id}`}
-              style={{ cursor: 'pointer', color: '#888' }}
-            />
-          </Popover>
-        ),
       },
     ],
     [sortField, sortOrder],
@@ -259,62 +309,90 @@ export default function FilesTable() {
             style={{ width: 160 }}
             data-testid="files-status-filter"
           />
+          <Popconfirm
+            title={`Delete ${selectedKeys.length} file(s)?`}
+            description="This soft-deletes the rows. They won't appear in the list anymore."
+            okText="Delete"
+            okButtonProps={{ danger: true, loading: deleting }}
+            onConfirm={handleDelete}
+            disabled={selectedKeys.length === 0}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              disabled={selectedKeys.length === 0}
+              loading={deleting}
+              data-testid="files-delete-button"
+            >
+              Delete{selectedKeys.length > 0 ? ` (${selectedKeys.length})` : ''}
+            </Button>
+          </Popconfirm>
         </Space>
-        <Table<FileRow>
-          rowKey="id"
-          size="small"
-          loading={loading}
-          dataSource={data}
-          columns={columns}
-          locale={{ emptyText: <Empty description="No files yet" /> }}
-          onChange={handleTableChange}
-          pagination={{
-            current: page + 1,
-            pageSize: PAGE_SIZE,
-            total,
-            showSizeChanger: false,
-          }}
-          expandable={{
-            expandedRowRender: (row) => (
-              <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                <div>
-                  <Text strong>Prompt</Text>
-                  <Paragraph
-                    style={{
-                      marginTop: 4,
-                      whiteSpace: 'pre-wrap',
-                      background: '#fafafa',
-                      padding: 8,
-                      borderRadius: 4,
-                    }}
-                  >
-                    {row.instruction}
-                  </Paragraph>
-                </div>
-                <div>
-                  <Text strong>Summary</Text>
-                  <Paragraph
-                    style={{
-                      marginTop: 4,
-                      whiteSpace: 'pre-wrap',
-                      background: '#fafafa',
-                      padding: 8,
-                      borderRadius: 4,
-                    }}
-                  >
-                    {row.status === 'FAILED' ? (
-                      <Text type="danger">{row.errorMessage ?? 'failed'}</Text>
-                    ) : row.summary ? (
-                      row.summary
-                    ) : (
-                      <Text type="secondary">…not ready</Text>
-                    )}
-                  </Paragraph>
-                </div>
-              </Space>
-            ),
-          }}
-        />
+        <RowsContext.Provider value={data}>
+          <Table<FileRow>
+            rowKey="id"
+            size="small"
+            loading={loading}
+            dataSource={data}
+            columns={columns}
+            components={{ body: { row: HoverableRow } }}
+            rowSelection={{
+              type: 'checkbox',
+              selectedRowKeys: selectedKeys,
+              onChange: setSelectedKeys,
+              preserveSelectedRowKeys: false,
+            }}
+            locale={{ emptyText: <Empty description="No files yet" /> }}
+            onChange={handleTableChange}
+            pagination={{
+              current: page + 1,
+              pageSize: PAGE_SIZE,
+              total,
+              showSizeChanger: false,
+            }}
+            expandable={{
+              expandRowByClick: true,
+              expandedRowRender: (row) => (
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <div>
+                    <Text strong>Prompt</Text>
+                    <Paragraph
+                      style={{
+                        marginTop: 4,
+                        whiteSpace: 'pre-wrap',
+                        background: '#fafafa',
+                        padding: 8,
+                        borderRadius: 4,
+                      }}
+                    >
+                      {row.instruction}
+                    </Paragraph>
+                  </div>
+                  <div>
+                    <Text strong>Summary</Text>
+                    <Paragraph
+                      style={{
+                        marginTop: 4,
+                        whiteSpace: 'pre-wrap',
+                        background: '#fafafa',
+                        padding: 8,
+                        borderRadius: 4,
+                      }}
+                    >
+                      {row.status === 'FAILED' ? (
+                        <Text type="danger">{row.errorMessage ?? 'failed'}</Text>
+                      ) : row.summary ? (
+                        row.summary
+                      ) : (
+                        <Text type="secondary">…not ready</Text>
+                      )}
+                    </Paragraph>
+                  </div>
+                </Space>
+              ),
+            }}
+          />
+        </RowsContext.Provider>
       </Space>
     </Card>
   );

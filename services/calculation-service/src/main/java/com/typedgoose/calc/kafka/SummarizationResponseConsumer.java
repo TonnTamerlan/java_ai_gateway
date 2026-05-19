@@ -60,7 +60,7 @@ public class SummarizationResponseConsumer {
     }
 
     private void rollUpJob(UUID jobId, Instant now) {
-        List<SummarizationFile> rows = files.findByJobIdOrderByCreatedAt(jobId);
+        List<SummarizationFile> rows = files.findByJobIdAndDeletedAtIsNullOrderByCreatedAt(jobId);
         if (rows.isEmpty()) return;
 
         boolean allTerminal = rows.stream().allMatch(r ->

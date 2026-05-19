@@ -20,7 +20,7 @@ public class FilesRepositoryImpl implements FilesRepositoryCustom {
 
     @Override
     public Page<SummarizationFile> search(FileStatus status, String nameSubstring, Pageable pageable) {
-        Criteria criteria = Criteria.empty();
+        Criteria criteria = Criteria.where("deletedAt").isNull();
         if (status != null) {
             criteria = criteria.and("status").is(status.name());
         }
@@ -28,7 +28,7 @@ public class FilesRepositoryImpl implements FilesRepositoryCustom {
             criteria = criteria.and("fileName").like("%" + nameSubstring + "%").ignoreCase(true);
         }
 
-        Query baseQuery = criteria.isEmpty() ? Query.empty() : Query.query(criteria);
+        Query baseQuery = Query.query(criteria);
         long total = template.count(baseQuery, SummarizationFile.class);
 
         Query pagedQuery = baseQuery.with(pageable);

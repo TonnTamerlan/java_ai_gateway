@@ -19,23 +19,29 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.mockito.ArgumentCaptor;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.http.MediaType;
 
 @WebMvcTest(controllers = SummarizeController.class)
 class SummarizeControllerTest {
@@ -123,7 +129,8 @@ class SummarizeControllerTest {
                 "alpha.txt", "body", "do it", FileStatus.DONE,
                 "summary", "gpt-4o-mini", 11, 7, null,
                 Instant.parse("2026-05-19T09:00:00Z"),
-                Instant.parse("2026-05-19T09:01:00Z"));
+                Instant.parse("2026-05-19T09:01:00Z"),
+                null);
         Pageable expectedPageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<SummarizationFile> page = new PageImpl<>(List.of(row), expectedPageable, 1);
         given(files.search(isNull(), isNull(), any(Pageable.class))).willReturn(page);
@@ -183,6 +190,62 @@ class SummarizeControllerTest {
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         then(files).should().search(isNull(), isNull(), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(100);
+    }
+
+    @Test
+    void deleteFilesWithMissingBodyIsRejectedAs400() throws Exception {
+        mvc.perform(delete("/summarize/files")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+
+        then(files).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void deleteFilesWithEmptyIdListIsRejectedAs400() throws Exception {
+        mvc.perform(delete("/summarize/files")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+
+        then(files).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void deleteFilesHappyPathSoftDeletesAndReturnsCount() throws Exception {
+        UUID a = UUID.randomUUID();
+        UUID b = UUID.randomUUID();
+        given(files.softDelete(anyCollection(), any(Instant.class))).willReturn(2);
+
+        mvc.perform(delete("/summarize/files")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + a + "\",\"" + b + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(2));
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Collection<UUID>> captor =
+                ArgumentCaptor.forClass((Class) Collection.class);
+        then(files).should().softDelete(captor.capture(), any(Instant.class));
+        assertThat(captor.getValue()).containsExactlyInAnyOrder(a, b);
+    }
+
+    @Test
+    void deleteFilesAbove100IdsIsRejectedAs400() throws Exception {
+        String body = "{\"ids\":[" + IntStream.range(0, 101)
+                .mapToObj(i -> "\"" + UUID.randomUUID() + "\"")
+                .collect(Collectors.joining(",")) + "]}";
+
+        mvc.perform(delete("/summarize/files")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
+
+        then(files).shouldHaveNoInteractions();
     }
 
     private static MockMultipartFile txt(String name, String body) {

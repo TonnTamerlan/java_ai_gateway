@@ -18,6 +18,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,7 +76,7 @@ class FilesRepositorySearchIT {
                 summary == null ? null : 100,
                 summary == null ? null : 50,
                 status == FileStatus.FAILED ? "boom" : null,
-                at, at));
+                at, at, null));
     }
 
     @Test
@@ -126,5 +127,52 @@ class FilesRepositorySearchIT {
         assertThat(page.getTotalElements()).isEqualTo(2);
         assertThat(page.getContent()).extracting(SummarizationFile::fileName)
                 .containsExactly("alpha.txt", "alphabet.txt");
+    }
+
+    @Test
+    void searchExcludesSoftDeletedRows() {
+        List<UUID> idsBeforeDelete = files.search(null, null,
+                        PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")))
+                .getContent().stream().map(SummarizationFile::id).toList();
+        // Soft-delete the first two seeded files (alpha.txt and beta.txt by createdAt asc).
+        int deleted = files.softDelete(List.of(idsBeforeDelete.get(0), idsBeforeDelete.get(1)),
+                Instant.parse("2026-05-19T11:00:00Z"));
+        assertThat(deleted).isEqualTo(2);
+
+        Page<SummarizationFile> page = files.search(null, null,
+                PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")));
+
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(page.getContent()).extracting(SummarizationFile::fileName)
+                .containsExactly("Gamma.TXT", "delta.txt", "alphabet.txt");
+    }
+
+    @Test
+    void softDeleteIsIdempotentAndReturnsZeroForAlreadyDeleted() {
+        List<UUID> ids = files.search(null, null, PageRequest.of(0, 10)).getContent()
+                .stream().map(SummarizationFile::id).limit(2).toList();
+        Instant now = Instant.parse("2026-05-19T11:00:00Z");
+
+        int first = files.softDelete(ids, now);
+        int second = files.softDelete(ids, now.plusSeconds(60));
+
+        assertThat(first).isEqualTo(2);
+        assertThat(second).isZero();
+    }
+
+    @Test
+    void findByJobIdExcludesSoftDeletedRows() {
+        List<SummarizationFile> beforeDelete = files
+                .findByJobIdAndDeletedAtIsNullOrderByCreatedAt(jobId);
+        assertThat(beforeDelete).hasSize(5);
+
+        UUID target = beforeDelete.get(0).id();
+        int deleted = files.softDelete(List.of(target), Instant.parse("2026-05-19T11:00:00Z"));
+        assertThat(deleted).isEqualTo(1);
+
+        List<SummarizationFile> afterDelete = files
+                .findByJobIdAndDeletedAtIsNullOrderByCreatedAt(jobId);
+        assertThat(afterDelete).hasSize(4);
+        assertThat(afterDelete).extracting(SummarizationFile::id).doesNotContain(target);
     }
 }
