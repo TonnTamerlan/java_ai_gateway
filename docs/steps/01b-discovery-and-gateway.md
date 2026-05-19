@@ -1,6 +1,6 @@
 # Step 01b — Discovery + edge Spring Cloud Gateway + chat-service split
 
-**Status:** Pending — this step lands before Step 2 begins (architecture pivot, recorded in ADR D10).
+**Status:** Done — 2026-05-08 (architecture pivot, recorded in ADR D10).
 
 ## What this step lands
 

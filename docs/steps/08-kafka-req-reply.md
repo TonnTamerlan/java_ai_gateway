@@ -1,6 +1,6 @@
 # Step 8 — Kafka request/reply between Calculation Service ↔ AI Gateway
 
-**Status:** Pending.
+**Status:** Done — 2026-05-18 (commit `184db71`). Shipped as a calc-service-local Kafka publish + echo loop rather than a `ReplyingKafkaTemplate` request/reply round-trip; the real AI-side replacement landed in Step 9 (OpenAI Batch lifecycle).
 **Prereqs:** Step 7 green.
 
 ## Scope

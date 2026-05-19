@@ -1,6 +1,6 @@
 # Step 9 — OpenAI Batch API (`OpenAiBatchProvider`)
 
-**Status:** In progress (2026-05-19).
+**Status:** Done — 2026-05-19 (commit `bda3612`).
 **Prereqs:** Step 8 green.
 
 ## Scope
