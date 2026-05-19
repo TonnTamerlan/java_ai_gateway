@@ -4,6 +4,7 @@ springDependencyManagement = "1.1.7"
 springBootAdmin = "4.0.0"
 springCloud = "2025.1.1"
 springAi = "2.0.0-SNAPSHOT"
+openaiJava = "4.36.0"
 reactor = "3.8.0"
 jackson = "3.0.2"
 junitJupiter = "5.11.4"
@@ -26,6 +27,7 @@ spring-cloud-starter-netflix-eureka-client = { group = "org.springframework.clou
 spring-cloud-starter-netflix-eureka-server = { group = "org.springframework.cloud", name = "spring-cloud-starter-netflix-eureka-server" }
 spring-ai-bom = { group = "org.springframework.ai", name = "spring-ai-bom", version.ref = "springAi" }
 spring-ai-starter-model-openai = { group = "org.springframework.ai", name = "spring-ai-starter-model-openai" }
+openai-java = { group = "com.openai", name = "openai-java", version.ref = "openaiJava" }
 reactor-core = { group = "io.projectreactor", name = "reactor-core", version.ref = "reactor" }
 reactor-test = { group = "io.projectreactor", name = "reactor-test", version.ref = "reactor" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = "2.20" }

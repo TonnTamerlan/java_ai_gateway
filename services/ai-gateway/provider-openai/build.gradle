@@ -10,6 +10,8 @@ dependencies {
     api platform(libs.spring.ai.bom)
 
     api libs.spring.ai.starter.model.openai
+    api libs.openai.java
+    api libs.jackson.databind
 
     testImplementation libs.reactor.test
 }

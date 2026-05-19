@@ -193,10 +193,18 @@ services:
       EUREKA_HOST: eureka-server
       OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
       SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://postgres:5432/goose
+      DB_USER: goose
+      DB_PASSWORD: goose
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "8081:8081"
     depends_on:
       eureka-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health | grep -q '\"UP\"' || exit 1"]

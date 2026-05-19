@@ -14,7 +14,16 @@ dependencies {
     implementation project(':services:ai-gateway:ai-gateway-provider-openai')
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation libs.spring.cloud.starter.netflix.eureka.client
+    implementation libs.spring.kafka
+    implementation libs.spring.boot.starter.data.jdbc
+    implementation 'org.springframework.boot:spring-boot-flyway'
+    implementation libs.flyway.core
+    runtimeOnly libs.flyway.database.postgresql
+    runtimeOnly libs.postgresql
 
     testImplementation 'org.springframework.boot:spring-boot-webflux-test'
     testImplementation libs.reactor.test
+    testImplementation libs.testcontainers.postgresql
+    testImplementation libs.testcontainers.junit.jupiter
+    testImplementation libs.spring.kafka.test
 }

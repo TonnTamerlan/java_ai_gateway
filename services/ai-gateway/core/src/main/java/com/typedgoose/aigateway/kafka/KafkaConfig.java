@@ -1,4 +1,4 @@
-package com.typedgoose.calc.kafka;
+package com.typedgoose.aigateway.kafka;
 
 import com.typedgoose.contracts.summarization.SummarizationRequestMessage;
 import com.typedgoose.contracts.summarization.SummarizationResponseMessage;
@@ -38,12 +38,21 @@ public class KafkaConfig {
 
     private final String bootstrapServers;
     private final String consumerGroupId;
+    private final int maxPollRecords;
+    private final int fetchMinBytes;
+    private final int fetchMaxWaitMs;
 
     public KafkaConfig(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
-            @Value("${spring.kafka.consumer.group-id:calc-service}") String consumerGroupId) {
+            @Value("${spring.kafka.consumer.group-id:ai-gateway}") String consumerGroupId,
+            @Value("${spring.kafka.consumer.max-poll-records:5}") int maxPollRecords,
+            @Value("${spring.kafka.consumer.fetch-min-bytes:5000}") int fetchMinBytes,
+            @Value("${spring.kafka.consumer.fetch-max-wait:180000}") int fetchMaxWaitMs) {
         this.bootstrapServers = bootstrapServers;
         this.consumerGroupId = consumerGroupId;
+        this.maxPollRecords = maxPollRecords;
+        this.fetchMinBytes = fetchMinBytes;
+        this.fetchMaxWaitMs = fetchMaxWaitMs;
     }
 
     @Bean
@@ -55,15 +64,15 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic summarizationRequestsTopic() {
-        return TopicBuilder.name(SUMMARIZATION_REQUESTS_TOPIC)
+    public NewTopic summarizationResponsesTopic() {
+        return TopicBuilder.name(SUMMARIZATION_RESPONSES_TOPIC)
                 .partitions(3)
                 .replicas(1)
                 .build();
     }
 
     @Bean
-    public ProducerFactory<String, SummarizationRequestMessage> producerFactory() {
+    public ProducerFactory<String, SummarizationResponseMessage> responseProducerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -73,34 +82,42 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, SummarizationRequestMessage> kafkaTemplate(
-            ProducerFactory<String, SummarizationRequestMessage> producerFactory) {
-        return new KafkaTemplate<>(producerFactory);
+    public KafkaTemplate<String, SummarizationResponseMessage> responseKafkaTemplate(
+            ProducerFactory<String, SummarizationResponseMessage> responseProducerFactory) {
+        return new KafkaTemplate<>(responseProducerFactory);
     }
 
     @Bean
-    public ConsumerFactory<String, SummarizationResponseMessage> responseConsumerFactory() {
+    public ConsumerFactory<String, SummarizationRequestMessage> requestConsumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);
+        props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, fetchMinBytes);
+        props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, fetchMaxWaitMs);
+        // request.timeout.ms must exceed fetch.max.wait.ms; otherwise the
+        // consumer aborts each fetch at 30s (default) and re-issues, never
+        // letting the broker reach its wait threshold. Pad by 20s.
+        props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, fetchMaxWaitMs + 20000);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         props.put(ErrorHandlingDeserializer.KEY_DESERIALIZER_CLASS, StringDeserializer.class);
         props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JacksonJsonDeserializer.class);
         props.put(JacksonJsonDeserializer.TRUSTED_PACKAGES, "*");
         props.put(JacksonJsonDeserializer.VALUE_DEFAULT_TYPE,
-                SummarizationResponseMessage.class.getName());
+                SummarizationRequestMessage.class.getName());
         props.put(JacksonJsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, SummarizationResponseMessage>
-            responseListenerContainerFactory(
-                    ConsumerFactory<String, SummarizationResponseMessage> responseConsumerFactory) {
-        var factory = new ConcurrentKafkaListenerContainerFactory<String, SummarizationResponseMessage>();
-        factory.setConsumerFactory(responseConsumerFactory);
+    public ConcurrentKafkaListenerContainerFactory<String, SummarizationRequestMessage>
+            batchListenerContainerFactory(
+                    ConsumerFactory<String, SummarizationRequestMessage> requestConsumerFactory) {
+        var factory = new ConcurrentKafkaListenerContainerFactory<String, SummarizationRequestMessage>();
+        factory.setConsumerFactory(requestConsumerFactory);
+        factory.setBatchListener(true);
         return factory;
     }
 }

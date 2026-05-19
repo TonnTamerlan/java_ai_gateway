@@ -1,12 +1,43 @@
 spring:
   application:
     name: ai-gateway
+  # ai-gateway/core serves chat SSE via WebFlux. Spring Data JDBC pulls Spring MVC
+  # into scope and would flip Boot to the servlet stack — pin reactive explicitly.
+  main:
+    web-application-type: reactive
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:dummy}
       chat:
         options:
           stream-usage: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/goose}
+    username: ${DB_USER:goose}
+    password: ${DB_PASSWORD:goose}
+  flyway:
+    enabled: true
+    schemas: ai
+    default-schema: ai
+    locations: classpath:db/migration
+  # Note: `spring.kafka.bootstrap-servers` is intentionally NOT defaulted here.
+  # KafkaConfig is @ConditionalOnProperty on it, so tests without a broker skip
+  # the Kafka beans entirely. Docker compose sets SPRING_KAFKA_BOOTSTRAP_SERVERS,
+  # which Spring maps to the property automatically.
+  kafka:
+    consumer:
+      group-id: ai-gateway
+      auto-offset-reset: earliest
+      max-poll-records: 5
+      # fetch-min-bytes + fetch-max-wait together approximate "5 OR ~3 min".
+      # Without fetch-min-bytes > 1, the broker returns instantly on the first
+      # byte and the 3-min ceiling is dead weight. 5000 bytes ≈ ~5 short
+      # summarization requests; tune as a knob.
+      fetch-min-bytes: 5000
+      fetch-max-wait: 180000
+      # KafkaConfig.java derives request.timeout.ms = fetch-max-wait + 20s so
+      # the consumer's fetch doesn't abort at the 30s default before the
+      # broker reaches its wait threshold.
 
 server:
   port: 8081
@@ -18,6 +49,8 @@ app:
       fast: gpt-4o-mini
       medium: gpt-4o
       slow: gpt-4-turbo
+    batch:
+      poll-interval-ms: 30000
 
 eureka:
   client:

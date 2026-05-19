@@ -5,7 +5,7 @@ import com.typedgoose.calc.db.JobsRepository;
 import com.typedgoose.calc.domain.FileStatus;
 import com.typedgoose.calc.domain.JobStatus;
 import com.typedgoose.calc.domain.SummarizationFile;
-import com.typedgoose.contracts.summarization.SummarizationRequestMessage;
+import com.typedgoose.contracts.summarization.SummarizationResponseMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,51 +18,44 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Step-08 placeholder: closes the loop locally so the UI sees a job complete.
- * A real consumer in ai-gateway will replace this once the OpenAI Batch path is wired.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "spring.kafka.bootstrap-servers")
-public class SummarizationEchoConsumer {
-
-    private static final String ECHO_MODEL = "echo-stub";
-    private static final int SUMMARY_PREVIEW_CHARS = 80;
+public class SummarizationResponseConsumer {
 
     private final FilesRepository files;
     private final JobsRepository jobs;
     private final Clock clock;
 
     @KafkaListener(
-            topics = KafkaConfig.SUMMARIZATION_REQUESTS_TOPIC,
-            containerFactory = "kafkaListenerContainerFactory",
+            topics = KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
+            containerFactory = "responseListenerContainerFactory",
             autoStartup = "${calc.kafka.listener.enabled:true}")
     @Transactional
-    public void onMessage(SummarizationRequestMessage message) {
+    public void onMessage(SummarizationResponseMessage message) {
         Instant now = clock.instant();
-        String preview = message.content() == null
-                ? ""
-                : message.content().strip();
-        if (preview.length() > SUMMARY_PREVIEW_CHARS) {
-            preview = preview.substring(0, SUMMARY_PREVIEW_CHARS) + "…";
-        }
-        String summary = "Echo (" + message.instruction() + "): " + preview;
+        int updated = switch (message.status()) {
+            case DONE -> files.markDone(
+                    message.correlationId(),
+                    message.summary(),
+                    message.model(),
+                    message.promptTokens(),
+                    message.completionTokens(),
+                    now);
+            case FAILED -> files.markFailed(
+                    message.correlationId(),
+                    message.errorMessage() == null ? "unknown error" : message.errorMessage(),
+                    now);
+        };
 
-        int updated = files.markDone(
-                message.correlationId(),
-                summary,
-                ECHO_MODEL,
-                null,
-                null,
-                now);
         if (updated == 0) {
-            log.info("echo consumer: file already terminal correlationId={}", message.correlationId());
+            log.info("response consumer: file already terminal correlationId={}",
+                    message.correlationId());
             return;
         }
-        log.info("echo consumer: marked DONE correlationId={} jobId={}",
-                message.correlationId(), message.jobId());
+        log.info("response consumer: marked {} correlationId={} jobId={}",
+                message.status(), message.correlationId(), message.jobId());
         rollUpJob(message.jobId(), now);
     }
 
@@ -82,6 +75,6 @@ public class SummarizationEchoConsumer {
                     ? JobStatus.FAILED
                     : JobStatus.DONE;
         jobs.updateStatus(jobId, next, now);
-        log.info("echo consumer: rolled up job status jobId={} status={}", jobId, next);
+        log.info("response consumer: rolled up job status jobId={} status={}", jobId, next);
     }
 }
