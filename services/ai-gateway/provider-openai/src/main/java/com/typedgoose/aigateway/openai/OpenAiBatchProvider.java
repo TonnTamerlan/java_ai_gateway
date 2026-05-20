@@ -149,17 +149,17 @@ public class OpenAiBatchProvider implements BatchProvider {
     private BatchResult parseResultLine(String line) {
         try {
             JsonNode root = objectMapper.readTree(line);
-            UUID correlationId = UUID.fromString(root.path("custom_id").asText());
+            UUID correlationId = UUID.fromString(root.path("custom_id").asString());
 
             JsonNode errorNode = root.get("error");
             if (errorNode != null && !errorNode.isNull()) {
-                String msg = errorNode.path("message").asText("provider error");
+                String msg = errorNode.path("message").asString("provider error");
                 return new BatchResult(correlationId, "", "", 0, 0, Optional.of(msg));
             }
 
             JsonNode body = root.path("response").path("body");
-            String model = body.path("model").asText("");
-            String content = body.path("choices").path(0).path("message").path("content").asText("");
+            String model = body.path("model").asString("");
+            String content = body.path("choices").path(0).path("message").path("content").asString("");
             int promptTokens = body.path("usage").path("prompt_tokens").asInt(0);
             int completionTokens = body.path("usage").path("completion_tokens").asInt(0);
 

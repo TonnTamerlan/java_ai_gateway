@@ -32,6 +32,11 @@ calc:
 
 server:
   port: 8082
+  tomcat:
+    # Spring Boot 4.0.x ships Tomcat 11 with maxPartCount=10 by default
+    # (security hardening). With prompt + up to MAX_FILES=10 file parts we hit
+    # 11 parts, so raise the cap with headroom. See spring-projects/spring-boot#49311.
+    max-part-count: 16
 
 eureka:
   client:
