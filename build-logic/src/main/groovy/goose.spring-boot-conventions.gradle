@@ -13,5 +13,19 @@ dependencyManagement {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation libs.logstash.logback.encoder
+
+    // Step 11 observability bundle — every Spring service exports OTLP traces to
+    // Jaeger via Micrometer Tracing and propagates baggage across HTTP + Kafka.
+    // The starter brings spring-boot-micrometer-tracing-opentelemetry (autoconfig),
+    // spring-boot-opentelemetry (SDK autoconfig), micrometer-tracing-bridge-otel,
+    // opentelemetry-exporter-otlp, and micrometer-registry-otlp transitively.
+    //
+    // Note: NO spring-boot-admin-starter-client is pulled in. SBA's server has
+    // @EnableDiscoveryClient and discovers each service through Eureka — no need
+    // for client-side push registration, which has a known Boot 4 bean-wiring
+    // issue (RegistrationClient bean missing).
+    implementation 'org.springframework.boot:spring-boot-starter-opentelemetry'
+    implementation libs.micrometer.context.propagation
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

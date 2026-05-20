@@ -6,6 +6,7 @@ import com.typedgoose.contracts.ai.BatchProvider;
 import com.typedgoose.contracts.ai.BatchResult;
 import com.typedgoose.contracts.ai.BatchStatus;
 import com.typedgoose.contracts.summarization.SummarizationResponseMessage;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,6 +32,7 @@ public class BatchPoller {
     private final BatchCorrelationsRepository correlations;
     private final KafkaTemplate<String, SummarizationResponseMessage> responseTemplate;
     private final Clock clock;
+    private final Tracer tracer;
 
     @Scheduled(
             fixedDelayString = "${app.ai.batch.poll-interval-ms:30000}",
@@ -78,28 +80,30 @@ public class BatchPoller {
                         result.correlationId(), handle.providerBatchId());
                 continue;
             }
-            Optional<String> error = result.error();
-            SummarizationResponseMessage msg = new SummarizationResponseMessage(
-                    row.jobId(),
-                    row.fileId(),
-                    row.correlationId(),
-                    error.isPresent()
-                            ? SummarizationResponseMessage.Status.FAILED
-                            : SummarizationResponseMessage.Status.DONE,
-                    error.isPresent() ? null : result.summary(),
-                    error.isPresent() ? null : result.model(),
-                    result.promptTokens(),
-                    result.completionTokens(),
-                    error.orElse(null));
-            responseTemplate.send(
-                    KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
-                    row.correlationId().toString(),
-                    msg);
+            try (var ignored = tracer.createBaggageInScope("jobId", row.jobId().toString())) {
+                Optional<String> error = result.error();
+                SummarizationResponseMessage msg = new SummarizationResponseMessage(
+                        row.jobId(),
+                        row.fileId(),
+                        row.correlationId(),
+                        error.isPresent()
+                                ? SummarizationResponseMessage.Status.FAILED
+                                : SummarizationResponseMessage.Status.DONE,
+                        error.isPresent() ? null : result.summary(),
+                        error.isPresent() ? null : result.model(),
+                        result.promptTokens(),
+                        result.completionTokens(),
+                        error.orElse(null));
+                responseTemplate.send(
+                        KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
+                        row.correlationId().toString(),
+                        msg);
 
-            if (error.isPresent()) {
-                correlations.markFailed(row.correlationId(), now);
-            } else {
-                correlations.markDone(row.correlationId(), now);
+                if (error.isPresent()) {
+                    correlations.markFailed(row.correlationId(), now);
+                } else {
+                    correlations.markDone(row.correlationId(), now);
+                }
             }
         }
         log.info("finalized batch: batchId={} results={}",
@@ -110,21 +114,23 @@ public class BatchPoller {
         List<BatchCorrelation> rows = correlations.findByProviderBatchId(handle.providerBatchId());
         Instant now = clock.instant();
         for (BatchCorrelation row : rows) {
-            SummarizationResponseMessage msg = new SummarizationResponseMessage(
-                    row.jobId(),
-                    row.fileId(),
-                    row.correlationId(),
-                    SummarizationResponseMessage.Status.FAILED,
-                    null,
-                    null,
-                    0,
-                    0,
-                    "batch " + reason);
-            responseTemplate.send(
-                    KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
-                    row.correlationId().toString(),
-                    msg);
-            correlations.markFailed(row.correlationId(), now);
+            try (var ignored = tracer.createBaggageInScope("jobId", row.jobId().toString())) {
+                SummarizationResponseMessage msg = new SummarizationResponseMessage(
+                        row.jobId(),
+                        row.fileId(),
+                        row.correlationId(),
+                        SummarizationResponseMessage.Status.FAILED,
+                        null,
+                        null,
+                        0,
+                        0,
+                        "batch " + reason);
+                responseTemplate.send(
+                        KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
+                        row.correlationId().toString(),
+                        msg);
+                correlations.markFailed(row.correlationId(), now);
+            }
         }
         log.warn("batch failed: batchId={} reason={} rows={}",
                 handle.providerBatchId(), reason, rows.size());

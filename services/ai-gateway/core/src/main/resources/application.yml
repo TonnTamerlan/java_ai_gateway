@@ -5,6 +5,8 @@ spring:
   # into scope and would flip Boot to the servlet stack — pin reactive explicitly.
   main:
     web-application-type: reactive
+  reactor:
+    context-propagation: auto
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:dummy}
@@ -69,9 +71,31 @@ management:
       probes:
         enabled: true
       show-details: always
+    loggers:
+      access: unrestricted
   info:
     env:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      correlation:
+        enabled: true
+        fields: correlationId,chatId,jobId
+      remote-fields: correlationId,chatId,jobId
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${JAEGER_OTLP_ENDPOINT:http://jaeger:4317}
+          transport: grpc
+          timeout: 10s
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}] "
+  include-application-name: false
 
 info:
   app:

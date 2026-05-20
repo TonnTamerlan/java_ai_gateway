@@ -75,7 +75,9 @@ public class KafkaConfig {
     @Bean
     public KafkaTemplate<String, SummarizationRequestMessage> kafkaTemplate(
             ProducerFactory<String, SummarizationRequestMessage> producerFactory) {
-        return new KafkaTemplate<>(producerFactory);
+        var template = new KafkaTemplate<>(producerFactory);
+        template.setObservationEnabled(true);
+        return template;
     }
 
     @Bean
@@ -101,6 +103,7 @@ public class KafkaConfig {
                     ConsumerFactory<String, SummarizationResponseMessage> responseConsumerFactory) {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, SummarizationResponseMessage>();
         factory.setConsumerFactory(responseConsumerFactory);
+        factory.getContainerProperties().setObservationEnabled(true);
         return factory;
     }
 }

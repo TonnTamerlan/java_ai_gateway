@@ -1,6 +1,6 @@
 # Step 11 — ELK + Jaeger + Spring Boot Admin (cross-cutting)
 
-**Status:** Partially done — logging slice landed on 2026-05-13. Remaining: OTel→Jaeger traces, full SBA polish, and the dashboards/searches bundle beyond the minimal one we shipped.
+**Status:** Done — logging slice landed 2026-05-13; OTel/MDC/SBA/Kibana slice landed 2026-05-20.
 **Prereqs:** Step 10 green.
 
 ## Done in the 2026-05-13 partial pass
@@ -12,12 +12,29 @@
 - `infra/kibana/saved-objects.ndjson` ships a data view (`logs-*`, time field `@timestamp`) and a Discover saved search ("All service logs", columns `service`, `level`, `logger_name`, `message`). A one-shot `kibana-init` compose service POSTs it to `/api/saved_objects/_import?overwrite=true` after Kibana is healthy.
 - Verified end-to-end: `docker compose up`, hit health endpoints, all six services appear in `_cat/indices/.ds-logs-*` and in Kibana Discover.
 
-## Still deferred
+## Done in the 2026-05-20 OTel/MDC slice
 
-- Correlation-id `WebFilter` populating `MDC` (`correlationId`, `chatId`/`jobId`). The encoder already lists those `includeMdcKeyName`s, so they'll start showing up automatically once a filter populates them.
-- OpenTelemetry → Jaeger instrumentation across REST + Kafka + DB + Spring AI.
-- Spring Boot Admin dashboards and live log-level toggling.
-- Richer Kibana saved objects (per-flow dashboards: chat-trace, calc-job-trace).
+- **Tracing stack**: `spring-boot-starter-opentelemetry` added to `goose.spring-boot-conventions.gradle`; pulls in `spring-boot-micrometer-tracing-opentelemetry`, `spring-boot-opentelemetry`, `micrometer-tracing-bridge-otel`, `opentelemetry-exporter-otlp`, `micrometer-registry-otlp`. Plus `io.micrometer:context-propagation` for the Reactor↔ThreadLocal bridge.
+- **Per-service `application.yml` (6 services)**: 100% sampling, `management.opentelemetry.tracing.export.otlp.endpoint=${JAEGER_OTLP_ENDPOINT:http://jaeger:4317}` (Boot 4's namespace, not Boot 3's `management.otlp.tracing`), `management.tracing.baggage.correlation.fields: correlationId,chatId,jobId` + `remote-fields: correlationId,chatId,jobId`, `management.endpoint.loggers.access: unrestricted` (Boot 4 default tightened to `read_only`; SBA can't `PATCH /actuator/loggers/{name}` without this), `spring.reactor.context-propagation: auto`, and the Sleuth-style `logging.pattern.correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}] "`.
+- **Kafka W3C trace propagation**: `KafkaTemplate.setObservationEnabled(true)` + `containerProperties.setObservationEnabled(true)` on both producer templates and both listener container factories (calc-service `KafkaConfig`, ai-gateway `KafkaConfig`). Producer-side spans (`summarization-requests send`) appear in Jaeger linked to the originating HTTP request. Note: Spring Kafka 3.x batch listeners don't emit a consumer span — records are still processed correctly, just no `receive` span on the consumer side.
+- **Correlation-id propagation**: new `services/api-gateway/.../observability/CorrelationIdFilter.java` (`GlobalFilter` at highest precedence) mints `X-Correlation-Id` if missing, propagates downstream as a per-field `correlationId` header (Boot 4's `remote-fields` accepts the simple header on inbound), echoes on the response. Don't use `try-with-resources` around `chain.filter` — Mono subscription happens after the scope closes; header propagation is the reliable reactive path.
+- **`jobId` baggage**: `SummarizationService.submit` opens a `tracer.createBaggageInScope("jobId", jobId)` around the persist+publish loop. `BatchPoller.finalizeCompleted`/`finalizeFailed` open the same baggage per row so the Kafka response message carries `jobId` (servlet/scheduler context — try-with-resources is fine here).
+- **`chatId` baggage**: `ChatController.postMessage` opens `tracer.createBaggageInScope("chatId", conversationId)` synchronously while assembling the SSE pipeline; `spring.reactor.context-propagation: auto` captures the active observation into Reactor Context at subscription time.
+- **SBA Eureka discovery**: kept the existing `@EnableDiscoveryClient` server pattern — services do *not* pull `spring-boot-admin-starter-client` (SBA 4.0 has a known `RegistrationClient` bean-wiring issue with Boot 4 reactive apps). SBA server polls Eureka for the 5 client services and surfaces their actuator endpoints. `/loggers` is unrestricted, so live log-level toggling from the SBA UI works.
+- **Kibana saved objects**: three new searches in `infra/kibana/saved-objects.ndjson` — "Chat trace by traceId" (columns include `traceId`/`chatId`/`correlationId`, sort asc to read top-to-bottom), "Calc job trace" (`jobId : *`, sort asc), "Errors only" (`level : ("ERROR" or "WARN")`). The `kibana-init` one-shot compose service re-imports them on stack up.
+- **Verified end-to-end on the live stack**: all six services appear in Jaeger; `[<service>,<traceId>,<spanId>,<correlationId>]` populates per-request log lines; submitting a job through api-gateway with `-H "X-Correlation-Id: foo"` produces ES hits filterable by `correlationId: foo` AND `jobId: <uuid>` across calc-service + ai-gateway; SBA `POST /actuator/loggers/com.typedgoose.chat` with `{"configuredLevel":"DEBUG"}` returns 204 and persists.
+
+## Still deferred (out of scope for this round)
+
+- A hand-built **Goose Overview dashboard** in `infra/kibana/saved-objects.ndjson` — Lens NDJSON is brittle to hand-author. Pattern (when needed): build in live Kibana at `localhost:5601`, Stack Management → Saved Objects → Export, replace the file, re-run `kibana-init`.
+- **Consumer-side Kafka span** on the Spring Kafka batch listener — appears to be a framework limitation; producer-side spans + jobId baggage in MDC already give us per-job log stitching in Kibana.
+- **Prometheus + Grafana** — explicitly out of scope; SBA + Jaeger + Kibana is enough for the meet-up.
+
+## Operator runbook (find a request end-to-end)
+
+1. From Kibana Discover, filter by the `correlationId` or `jobId` field; the saved searches "Calc job trace" and "Chat trace by traceId" pre-populate the right columns.
+2. Note the `traceId` from any hit, paste it into Jaeger at `http://localhost:16686` → "Search by Trace ID" to see the cross-service span tree (HTTP + Kafka send + JDBC).
+3. To follow up at the service level, open SBA at `http://localhost:9000` → service → Loggers tab → toggle `com.typedgoose.<package>` to `DEBUG`, replay the request, then back to `INFO`.
 
 ## Scope
 

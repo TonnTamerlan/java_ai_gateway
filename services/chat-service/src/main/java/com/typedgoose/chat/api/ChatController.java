@@ -5,6 +5,7 @@ import com.typedgoose.contracts.ai.ChatChunk;
 import com.typedgoose.contracts.ai.ChatMessage;
 import com.typedgoose.contracts.ai.ChatStreamRequest;
 import com.typedgoose.contracts.ai.MessageRole;
+import io.micrometer.tracing.Tracer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -28,12 +29,15 @@ public class ChatController {
     private final WebClient aiGatewayClient;
     private final ConversationStore store;
     private final String systemPrompt;
+    private final Tracer tracer;
 
     public ChatController(WebClient aiGatewayClient,
                           ConversationStore store,
+                          Tracer tracer,
                           @Value("${app.chat.system-prompt}") String systemPrompt) {
         this.aiGatewayClient = aiGatewayClient;
         this.store = store;
+        this.tracer = tracer;
         this.systemPrompt = systemPrompt;
     }
 
@@ -64,7 +68,13 @@ public class ChatController {
         StringBuilder assistantBuf = new StringBuilder();
         AtomicBoolean errored = new AtomicBoolean(false);
 
-        return aiGatewayClient.post()
+        // Open chatId baggage synchronously while subscribing. With
+        // `spring.reactor.context-propagation: auto`, Reactor captures the active
+        // observation into the Context at subscription time so the WebClient call
+        // (and the downstream service) sees `chatId` in MDC via the baggage→MDC bridge.
+        Flux<ServerSentEvent<ChatChunk>> chain;
+        try (var ignored = tracer.createBaggageInScope("chatId", conversationId)) {
+            chain = aiGatewayClient.post()
                 .uri("/v1/chat/stream")
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -101,6 +111,8 @@ public class ChatController {
                             logId(conversationId), turnIndex);
                     store.release(conversationId);
                 });
+        }
+        return chain;
     }
 
     private static ServerSentEvent<ChatChunk> toSse(ChatChunk chunk) {

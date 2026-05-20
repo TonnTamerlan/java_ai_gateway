@@ -1,6 +1,8 @@
 spring:
   application:
     name: spring-boot-admin
+  reactor:
+    context-propagation: auto
 
 server:
   port: 9000
@@ -16,9 +18,36 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,env,loggers,prometheus,beans,mappings,configprops,heapdump,threaddump
   endpoint:
     health:
       probes:
         enabled: true
       show-details: always
+    loggers:
+      access: unrestricted
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      correlation:
+        enabled: true
+        fields: correlationId,chatId,jobId
+      remote-fields: correlationId,chatId,jobId
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${JAEGER_OTLP_ENDPOINT:http://jaeger:4317}
+          transport: grpc
+          timeout: 10s
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}] "
+  include-application-name: false
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: Spring Boot Admin — dashboard for the Goose stack

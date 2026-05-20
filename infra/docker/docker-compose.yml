@@ -155,8 +155,15 @@ services:
       dockerfile: infra/eureka-server/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # OTEL_* env vars are intentionally NOT set. Spring's OtlpTracingAutoConfiguration
+      # reads `management.otlp.tracing.endpoint` and derives `service.name` from
+      # `spring.application.name`. OTEL_* would shadow that and silently drift.
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4317
     ports:
       - "8761:8761"
+    depends_on:
+      jaeger:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8761/actuator/health | grep -q '\"UP\"' || exit 1"]
       interval: 10s
@@ -173,10 +180,13 @@ services:
       SERVER_PORT: 9000
       EUREKA_HOST: eureka-server
       SPRING_PROFILES_ACTIVE: docker
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4317
     ports:
       - "9000:9000"
     depends_on:
       eureka-server:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9000/actuator/health | grep -q '\"UP\"' || exit 1"]
@@ -197,6 +207,7 @@ services:
       DB_USER: goose
       DB_PASSWORD: goose
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4317
     ports:
       - "8081:8081"
     depends_on:
@@ -205,6 +216,8 @@ services:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health | grep -q '\"UP\"' || exit 1"]
@@ -220,10 +233,13 @@ services:
     environment:
       EUREKA_HOST: eureka-server
       SPRING_PROFILES_ACTIVE: docker
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4317
     ports:
       - "8080:8080"
     depends_on:
       eureka-server:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"UP\"' || exit 1"]
@@ -239,10 +255,13 @@ services:
     environment:
       EUREKA_HOST: eureka-server
       SPRING_PROFILES_ACTIVE: docker
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4317
     ports:
       - "8083:8083"
     depends_on:
       eureka-server:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health | grep -q '\"UP\"' || exit 1"]
@@ -262,6 +281,7 @@ services:
       DB_USER: goose
       DB_PASSWORD: goose
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAEGER_OTLP_ENDPOINT: http://jaeger:4317
     ports:
       - "8082:8082"
     depends_on:
@@ -270,6 +290,8 @@ services:
       postgres:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health | grep -q '\"UP\"' || exit 1"]

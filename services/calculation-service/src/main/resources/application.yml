@@ -1,6 +1,8 @@
 spring:
   application:
     name: calculation-service
+  reactor:
+    context-propagation: auto
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/goose}
     username: ${DB_USER:goose}
@@ -55,9 +57,31 @@ management:
       probes:
         enabled: true
       show-details: always
+    loggers:
+      access: unrestricted
   info:
     env:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      correlation:
+        enabled: true
+        fields: correlationId,chatId,jobId
+      remote-fields: correlationId,chatId,jobId
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${JAEGER_OTLP_ENDPOINT:http://jaeger:4317}
+          transport: grpc
+          timeout: 10s
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}] "
+  include-application-name: false
 
 info:
   app:

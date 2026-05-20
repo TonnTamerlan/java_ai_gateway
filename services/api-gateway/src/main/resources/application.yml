@@ -3,6 +3,8 @@ spring:
     name: api-gateway
   codec:
     max-in-memory-size: 12MB
+  reactor:
+    context-propagation: auto
   cloud:
     gateway:
       server:
@@ -54,9 +56,31 @@ management:
       probes:
         enabled: true
       show-details: always
+    loggers:
+      access: unrestricted
   info:
     env:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      correlation:
+        enabled: true
+        fields: correlationId,chatId,jobId
+      remote-fields: correlationId,chatId,jobId
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${JAEGER_OTLP_ENDPOINT:http://jaeger:4317}
+          transport: grpc
+          timeout: 10s
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-}] "
+  include-application-name: false
 
 info:
   app:

@@ -3,6 +3,7 @@ package com.typedgoose.chat.api;
 import com.typedgoose.chat.conversation.ConversationStore;
 import com.typedgoose.contracts.ai.MessageRole;
 import com.typedgoose.contracts.ai.ModelTier;
+import io.micrometer.tracing.Tracer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,11 @@ class ChatControllerTest {
 
     @TestConfiguration
     static class TestConfig {
+        @Bean
+        Tracer tracer() {
+            return Tracer.NOOP;
+        }
+
         @Bean
         WebClient aiGatewayClient() {
             return WebClient.builder()

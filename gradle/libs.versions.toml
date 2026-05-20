@@ -34,6 +34,9 @@ jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-an
 jackson-databind = { group = "tools.jackson.core", name = "jackson-databind", version.ref = "jackson" }
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 logstash-logback-encoder = { group = "net.logstash.logback", name = "logstash-logback-encoder", version.ref = "logstashLogbackEncoder" }
+# Step 11 — observability. Versions managed by the Boot 4 BOM, so no [versions] entries.
+# Tracing/OTLP pulled in via `spring-boot-starter-opentelemetry` (literal in convention plugin).
+micrometer-context-propagation = { group = "io.micrometer", name = "context-propagation" }
 spring-boot-starter-jdbc = { group = "org.springframework.boot", name = "spring-boot-starter-jdbc" }
 spring-boot-starter-data-jdbc = { group = "org.springframework.boot", name = "spring-boot-starter-data-jdbc" }
 spring-kafka = { group = "org.springframework.kafka", name = "spring-kafka" }
