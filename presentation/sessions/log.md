@@ -429,3 +429,37 @@ _Followed the canonical Boot 3 OTel recipe (`micrometer-tracing-bridge-otel` + `
 6. **SBA live log toggle.** Open `http://localhost:9000` → 5 services. Click calc-service → Loggers → search `com.typedgoose.calc` → set to `DEBUG`. `curl -X POST localhost:8080/api/summarize ...` again. Switch to Kibana → `level: DEBUG AND service: calculation-service` → fresh lines. Toggle back to INFO from the SBA UI. _The 30-second loop: SBA → request → Kibana → SBA reset._
 
 ---
+
+## 2026-05-21 — When the obvious refactor is wrong: WebClient → Feign → `@HttpExchange`
+_"Use Feign instead of WebClient" sounds like an ergonomic preference. Investigation shows the only inner-service call is SSE — and Spring Cloud OpenFeign is blocking-only. The right answer is `@HttpExchange` over a load-balanced WebClient — the Spring-native declarative client most people don't know about. Same shape as Feign, supports `Flux<T>`. Repeat of last session's pattern: advisor + `AskUserQuestion` catch the directive-vs-reality conflict at plan time._
+
+### Built / fixed
+- New typed client: `services/chat-service/src/main/java/com/typedgoose/chat/client/AiGatewayClient.java` — 12 lines, one `@PostExchange`, `Flux<ChatChunk>` return.
+- Proxy wired through the existing `@LoadBalanced WebClient.Builder` so Eureka `lb://ai-gateway` discovery still works: `services/chat-service/src/main/java/com/typedgoose/chat/config/WebClientConfig.java:21-29`.
+- Controller's `WebClient` fluent chain collapses to one line — `aiGatewayClient.streamChat(upstream)` — preserving baggage scope, error mapping, lifecycle hooks: `services/chat-service/src/main/java/com/typedgoose/chat/api/ChatController.java`.
+- Test stubs the interface directly with `Flux<ChatChunk>` instead of feeding SSE bytes through `WebClient.exchangeFunction`: `services/chat-service/src/test/java/com/typedgoose/chat/api/ChatControllerTest.java`.
+- 5 files changed, +65/-78. Net reduction. Commit `33a9421`.
+
+### Decisions and trade-offs
+- **`@HttpExchange`, not Spring Cloud OpenFeign** — OpenFeign is blocking-only; would silently kill the `Flux<ChatChunk>` SSE stream. `@HttpExchange` (Spring 6.1+) is the Spring-native declarative client — same Feign-like surface, supports `Flux<T>`, already on the classpath via `spring-web`. Zero new dependencies.
+- **`WebClientAdapter`, not plain `@HttpExchange`** — plain `@HttpExchange` loses `@LoadBalanced` integration. Routing through `HttpServiceProxyFactory.builderFor(WebClientAdapter.create(loadBalancedClient))` is what keeps Eureka `lb://` working. This is the trick.
+- **Rejected reactive-feign (Playtika)** — community-maintained, Boot 4 compatibility unconfirmed, documented ~10× SSE latency. Wrong risk for a demo stack.
+
+### Surprises / aha moments
+- **The test got *simpler*, not harder.** Before: stub `WebClient.builder().exchangeFunction(req → Mono.just(ClientResponse.create(...).body(Flux<DataBuffer>(SSE bytes))))` with hand-crafted multi-line `event:delta\ndata:{...}` strings. After: a single-method lambda `request -> Flux.just(new ChatChunk.Delta("Hello"), new ChatChunk.Done(...))`. The "right" client gave the better test seam for free. _Stage cue: show the test diff side-by-side — this is the punchline._
+- **The directive that almost was.** "Replace X with Y" is a perfectly normal request, and Feign is a perfectly normal client. For *this* codebase — one SSE call in WebFlux — it was exactly wrong. Two parallel Explore agents diagnosed the conflict in ~90 seconds; landing it without investigation would have either silently broken SSE or pulled in a risky third-party reactive-feign. Same shape as last session's reactive-baggage trap.
+
+### Code worth showing
+- `services/chat-service/src/main/java/com/typedgoose/chat/client/AiGatewayClient.java` — the *entire* declarative client. Three meaningful lines.
+- `services/chat-service/src/main/java/com/typedgoose/chat/config/WebClientConfig.java:21-29` — the LoadBalancer-compatible wiring. `WebClientAdapter.create(webClient)` is the keyword most people miss.
+- `services/chat-service/src/test/java/com/typedgoose/chat/api/ChatControllerTest.java:50-58` — the lambda stub. Diff against the deleted `WebClient.exchangeFunction(...)` version for the test-seam moment.
+
+### Demo flow this session enables
+1. **The directive.** Read the prompt verbatim: _"do not use webclient to call inner services, use feign client instead. Utrathink."_ Sounds reasonable. Enter plan mode.
+2. **The conflict.** Two parallel Explore agents — one maps WebClient usage in chat-service (one call: SSE), one researches Feign+SSE feasibility (returns: blocking-only, breaks SSE, reactive-feign is risky). ~90 seconds.
+3. **The four-option `AskUserQuestion`.** User picks `@HttpExchange + WebClientAdapter`. ExitPlanMode.
+4. **The diff.** 5 files, +65/-78. Open `ChatController` before/after side-by-side — the 7-line fluent chain becomes one method call.
+5. **The test diff.** SSE bytes → typed `Flux<ChatChunk>`. Pause here.
+6. `./gradlew :services:chat-service:test` → 7/7 green. Live chat round-trip in the running stack proves both SSE *and* Eureka load-balancing still work.
+
+---
