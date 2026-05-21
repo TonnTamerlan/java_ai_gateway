@@ -1,5 +1,6 @@
 package com.typedgoose.chat.api;
 
+import com.typedgoose.chat.client.AiGatewayClient;
 import com.typedgoose.chat.conversation.ConversationStore;
 import com.typedgoose.contracts.ai.ChatChunk;
 import com.typedgoose.contracts.ai.ChatMessage;
@@ -15,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 
@@ -26,12 +26,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class ChatController {
 
-    private final WebClient aiGatewayClient;
+    private final AiGatewayClient aiGatewayClient;
     private final ConversationStore store;
     private final String systemPrompt;
     private final Tracer tracer;
 
-    public ChatController(WebClient aiGatewayClient,
+    public ChatController(AiGatewayClient aiGatewayClient,
                           ConversationStore store,
                           Tracer tracer,
                           @Value("${app.chat.system-prompt}") String systemPrompt) {
@@ -70,17 +70,11 @@ public class ChatController {
 
         // Open chatId baggage synchronously while subscribing. With
         // `spring.reactor.context-propagation: auto`, Reactor captures the active
-        // observation into the Context at subscription time so the WebClient call
+        // observation into the Context at subscription time so the outbound call
         // (and the downstream service) sees `chatId` in MDC via the baggage→MDC bridge.
         Flux<ServerSentEvent<ChatChunk>> chain;
         try (var ignored = tracer.createBaggageInScope("chatId", conversationId)) {
-            chain = aiGatewayClient.post()
-                .uri("/v1/chat/stream")
-                .accept(MediaType.TEXT_EVENT_STREAM)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(upstream)
-                .retrieve()
-                .bodyToFlux(ChatChunk.class)
+            chain = aiGatewayClient.streamChat(upstream)
                 .doOnNext(chunk -> {
                     if (chunk instanceof ChatChunk.Delta d) {
                         assistantBuf.append(d.text());

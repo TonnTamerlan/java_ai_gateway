@@ -1,8 +1,11 @@
 package com.typedgoose.chat.api;
 
+import com.typedgoose.chat.client.AiGatewayClient;
 import com.typedgoose.chat.conversation.ConversationStore;
+import com.typedgoose.contracts.ai.ChatChunk;
 import com.typedgoose.contracts.ai.MessageRole;
 import com.typedgoose.contracts.ai.ModelTier;
+import com.typedgoose.contracts.ai.Usage;
 import io.micrometer.tracing.Tracer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,16 +14,12 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
@@ -35,11 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class ChatControllerTest {
 
-    private static final DefaultDataBufferFactory bufferFactory = new DefaultDataBufferFactory();
-
     static final Deque<UpstreamStub> upstreamStubs = new ArrayDeque<>();
 
-    record UpstreamStub(HttpStatus status, String sseBody) {
+    record UpstreamStub(Flux<ChatChunk> chunks) {
     }
 
     @TestConfiguration
@@ -50,22 +47,14 @@ class ChatControllerTest {
         }
 
         @Bean
-        WebClient aiGatewayClient() {
-            return WebClient.builder()
-                    .exchangeFunction(request -> {
-                        UpstreamStub stub = upstreamStubs.pollFirst();
-                        if (stub == null) {
-                            return Mono.error(new IllegalStateException("no stub enqueued"));
-                        }
-                        ClientResponse.Builder builder = ClientResponse.create(stub.status())
-                                .header("Content-Type", MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8");
-                        if (!stub.sseBody().isEmpty()) {
-                            DataBuffer buf = bufferFactory.wrap(stub.sseBody().getBytes(StandardCharsets.UTF_8));
-                            builder = builder.body(Flux.just(buf));
-                        }
-                        return Mono.just(builder.build());
-                    })
-                    .build();
+        AiGatewayClient aiGatewayClient() {
+            return request -> {
+                UpstreamStub stub = upstreamStubs.pollFirst();
+                if (stub == null) {
+                    return Flux.error(new IllegalStateException("no stub enqueued"));
+                }
+                return stub.chunks();
+            };
         }
     }
 
@@ -82,17 +71,10 @@ class ChatControllerTest {
 
     @Test
     void singleTurnRelaysSseAndAppendsAssistantToHistory() {
-        upstreamStubs.add(ok("""
-                event:delta
-                data:{"type":"delta","text":"Hello"}
-
-                event:delta
-                data:{"type":"delta","text":" world"}
-
-                event:done
-                data:{"type":"done","usage":{"promptTokens":5,"completionTokens":2}}
-
-                """));
+        upstreamStubs.add(chunks(
+                new ChatChunk.Delta("Hello"),
+                new ChatChunk.Delta(" world"),
+                new ChatChunk.Done(new Usage(5, 2))));
 
         String body = postTurn("conv-1", ModelTier.FAST, "hi");
 
@@ -107,22 +89,12 @@ class ChatControllerTest {
 
     @Test
     void twoTurnsGrowHistory() {
-        upstreamStubs.add(ok("""
-                event:delta
-                data:{"type":"delta","text":"first reply"}
-
-                event:done
-                data:{"type":"done","usage":{"promptTokens":1,"completionTokens":1}}
-
-                """));
-        upstreamStubs.add(ok("""
-                event:delta
-                data:{"type":"delta","text":"second reply"}
-
-                event:done
-                data:{"type":"done","usage":{"promptTokens":2,"completionTokens":2}}
-
-                """));
+        upstreamStubs.add(chunks(
+                new ChatChunk.Delta("first reply"),
+                new ChatChunk.Done(new Usage(1, 1))));
+        upstreamStubs.add(chunks(
+                new ChatChunk.Delta("second reply"),
+                new ChatChunk.Done(new Usage(2, 2))));
 
         postTurn("conv-2", ModelTier.MEDIUM, "first user");
         postTurn("conv-2", ModelTier.MEDIUM, "second user");
@@ -132,7 +104,7 @@ class ChatControllerTest {
 
     @Test
     void upstreamHttpErrorMeansNoPartialAssistantTurnAppended() {
-        upstreamStubs.add(new UpstreamStub(HttpStatus.INTERNAL_SERVER_ERROR, ""));
+        upstreamStubs.add(upstreamError());
 
         String body = postTurn("conv-err", ModelTier.SLOW, "hi");
 
@@ -142,14 +114,9 @@ class ChatControllerTest {
 
     @Test
     void upstreamErrorChunkAlsoSkipsAssistantAppend() {
-        upstreamStubs.add(ok("""
-                event:delta
-                data:{"type":"delta","text":"partial"}
-
-                event:error
-                data:{"type":"error","code":"provider_error","message":"upstream went sideways"}
-
-                """));
+        upstreamStubs.add(chunks(
+                new ChatChunk.Delta("partial"),
+                new ChatChunk.Error("provider_error", "upstream went sideways")));
 
         String body = postTurn("conv-err2", ModelTier.MEDIUM, "ping");
 
@@ -198,7 +165,12 @@ class ChatControllerTest {
         return new String(raw == null ? new byte[0] : raw, StandardCharsets.UTF_8);
     }
 
-    private static UpstreamStub ok(String body) {
-        return new UpstreamStub(HttpStatus.OK, body);
+    private static UpstreamStub chunks(ChatChunk... cs) {
+        return new UpstreamStub(Flux.just(cs));
+    }
+
+    private static UpstreamStub upstreamError() {
+        return new UpstreamStub(Flux.error(WebClientResponseException.create(
+                500, "Internal Server Error", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8)));
     }
 }

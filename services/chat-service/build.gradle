@@ -3,7 +3,7 @@ plugins {
     id 'goose.testing-conventions'
 }
 
-description = 'Chat Service — chat REST + SSE relay BFF; calls ai-gateway over WebClient.'
+description = 'Chat Service — chat REST + SSE relay BFF; calls ai-gateway via @HttpExchange over a LoadBalanced WebClient.'
 
 springBoot {
     mainClass = 'com.typedgoose.chat.ChatServiceApplication'
