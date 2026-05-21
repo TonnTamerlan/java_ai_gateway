@@ -52,6 +52,13 @@ management:
           endpoint: ${JAEGER_OTLP_ENDPOINT:http://jaeger:4317}
           transport: grpc
           timeout: 10s
+  # Jaeger ingests traces only. The Micrometer OTLP meter registry would
+  # otherwise default to http://localhost:4318/v1/metrics and spam a
+  # ConnectionRefused stack trace every minute.
+  otlp:
+    metrics:
+      export:
+        enabled: false
 
 logging:
   pattern:
