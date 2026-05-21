@@ -15,7 +15,7 @@ sequenceDiagram
     Calc->>Eureka: POST /eureka/apps/CALCULATION-SERVICE (register)
     SBA->>Eureka: POST /eureka/apps/SPRING-BOOT-ADMIN (register)
 
-    Note over SBA,Eureka: SBA is also a discovery client — it pulls the registry instead of being pushed to.
+    Note over SBA,Eureka: SBA both registers itself and pulls the registry to discover monitored services.
     SBA->>Eureka: GET /eureka/apps (discover instances)
     Eureka-->>SBA: registry snapshot
 

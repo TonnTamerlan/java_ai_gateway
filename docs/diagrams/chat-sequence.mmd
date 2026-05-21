@@ -7,10 +7,10 @@ sequenceDiagram
     participant Gateway as ai-gateway
     participant OpenAI
 
-    Browser->>nginx: GET /api/chats/{id}/stream (EventSource)
+    Browser->>nginx: POST /api/chats/messages (fetch + ReadableStream)
     nginx->>SCG: proxy_pass (proxy_buffering off)
-    SCG->>Chat: lb://chat-service /chats/{id}/stream (StripPrefix=1)
-    Chat->>Gateway: GET /v1/chat/stream (Spring WebClient SSE)
+    SCG->>Chat: lb://chat-service /chats/messages (StripPrefix=1)
+    Chat->>Gateway: POST /v1/chat/stream (@HttpExchange · AiGatewayClient)
     Gateway->>OpenAI: ChatClient.stream(...)
     loop for each token
         OpenAI-->>Gateway: SSE: {"delta":"…"}

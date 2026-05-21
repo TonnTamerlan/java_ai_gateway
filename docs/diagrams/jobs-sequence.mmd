@@ -8,25 +8,25 @@ sequenceDiagram
     participant Gateway as ai-gateway
     participant OpenAI
 
-    %% --- Submit a job (sync REST) ---
-    Browser->>nginx: POST /api/jobs
+    %% --- Submit a job (multipart file upload) ---
+    Browser->>nginx: POST /api/summarize (multipart files[])
     nginx->>SCG: proxy_pass
-    SCG->>Calc: lb://calculation-service /jobs (StripPrefix=1)
+    SCG->>Calc: lb://calculation-service /summarize (StripPrefix=1)
     Calc-->>Browser: 202 { jobId, status: PENDING }
 
     %% --- Async heavy work consults AI via Kafka request/reply ---
-    Calc->>Kafka: produce ai.requests { correlationId, prompt }
-    Kafka->>Gateway: consume ai.requests
+    Calc->>Kafka: produce summarization-requests { correlationId, content }
+    Kafka->>Gateway: consume summarization-requests
     Gateway->>OpenAI: BatchClient.submit / ChatClient.call
     OpenAI-->>Gateway: result
-    Gateway->>Kafka: produce ai.responses { correlationId, result }
-    Kafka->>Calc: consume ai.responses (matching correlationId)
-    Calc->>Calc: persist final result, mark job DONE
+    Gateway->>Kafka: produce summarization-responses { correlationId, result }
+    Kafka->>Calc: consume summarization-responses (matching correlationId)
+    Calc->>Calc: persist final result, mark job DONE / PARTIAL / FAILED
 
-    %% --- Browser polls every ~1.5 s ---
+    %% --- Browser polls every 1500 ms ---
     loop until terminal
-        Browser->>nginx: GET /api/jobs/{jobId}
+        Browser->>nginx: GET /api/summarize/{jobId}
         nginx->>SCG: proxy_pass
-        SCG->>Calc: lb://calculation-service /jobs/{jobId}
-        Calc-->>Browser: { status: PENDING | RUNNING | DONE | FAILED }
+        SCG->>Calc: lb://calculation-service /summarize/{jobId}
+        Calc-->>Browser: { status: PENDING | RUNNING | DONE | PARTIAL | FAILED }
     end

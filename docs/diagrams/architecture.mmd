@@ -12,29 +12,29 @@ flowchart LR
     subgraph svc[Spring Boot 4 / Java 25 services]
         Gateway[api-gateway :8080<br/>Spring Cloud Gateway]
         Chat[chat-service :8083<br/>WebFlux]
-        AI[ai-gateway :8081<br/>stateless<br/>Spring AI + openai-java SDK]
+        AI[ai-gateway :8081<br/>stateless<br/>Spring AI chat · openai-java SDK batch]
         Calc[calculation-service :8082]
         Eureka[(eureka-server :8761)]
         SBA[spring-boot-admin :9000]
     end
 
     Proxy -- "/api/chats/**" --> Gateway
-    Proxy -- "/api/jobs/**" --> Gateway
+    Proxy -- "/api/summarize/**" --> Gateway
     Proxy -- "/api/health" --> Gateway
 
     Gateway -- "lb://chat-service" --> Chat
     Gateway -- "lb://calculation-service" --> Calc
 
-    Chat -- "REST + SSE" --> AI
-    Calc -- "Kafka ai.requests / ai.responses (correlation id)" --> AI
+    Chat -- "POST /v1/chat/stream<br/>(@HttpExchange · SSE)" --> AI
+    Calc -- "Kafka summarization-requests / summarization-responses<br/>(correlation id)" --> AI
     AI -- "OpenAI Chat / Batch" --> OpenAI[(OpenAI)]
 
     subgraph data[Data plane]
-        PG[(Postgres 16<br/>schemas: chat · calc)]
+        PG[(Postgres 16<br/>schemas: ai · calc)]
         Kafka[(Kafka KRaft<br/>topics created Step 7)]
     end
 
-    Chat --> PG
+    Chat -. "Step 12+" .-> PG
     Calc --> PG
     Calc --- Kafka
 
