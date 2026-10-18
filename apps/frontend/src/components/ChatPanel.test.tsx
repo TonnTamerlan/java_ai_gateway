@@ -109,6 +109,77 @@ describe('ChatPanel', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(textarea.value).toBe('line1');
   });
+
+  describe('auto-scroll while streaming', () => {
+    const encoder = new TextEncoder();
+    const delta = (text: string) =>
+      encoder.encode(`event:delta\ndata:{"type":"delta","text":"${text}"}\n\n`);
+
+    // jsdom has no layout: fake a growing scrollHeight and a writable scrollTop.
+    function stubScrollable(el: HTMLElement) {
+      const box = { scrollHeight: 0 };
+      Object.defineProperty(el, 'scrollHeight', { configurable: true, get: () => box.scrollHeight });
+      Object.defineProperty(el, 'clientHeight', { configurable: true, get: () => 100 });
+      Object.defineProperty(el, 'scrollTop', { configurable: true, writable: true, value: 0 });
+      return box;
+    }
+
+    function startStreamingChat() {
+      let controller!: ReadableStreamDefaultController<Uint8Array>;
+      const stream = new ReadableStream<Uint8Array>({ start: (c) => { controller = c; } });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+        ),
+      );
+      render(<ChatPanel />);
+      const list = screen.getByTestId('chat-messages');
+      const box = stubScrollable(list);
+      const textarea = screen.getByTestId('chat-input') as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: 'hi' } });
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      return { controller, list, box };
+    }
+
+    it('keeps the message list pinned to the bottom as deltas arrive', async () => {
+      const { controller, list, box } = startStreamingChat();
+
+      box.scrollHeight = 300;
+      controller.enqueue(delta('Hello'));
+      await waitFor(() =>
+        expect(screen.getByTestId('chat-message-assistant')).toHaveTextContent('Hello'),
+      );
+      expect(list.scrollTop).toBe(300);
+
+      box.scrollHeight = 600;
+      controller.enqueue(delta(' world'));
+      await waitFor(() =>
+        expect(screen.getByTestId('chat-message-assistant')).toHaveTextContent('Hello world'),
+      );
+      expect(list.scrollTop).toBe(600);
+      controller.close();
+    });
+
+    it('does not yank the user back down after they scroll up mid-stream', async () => {
+      const { controller, list, box } = startStreamingChat();
+
+      box.scrollHeight = 1000;
+      controller.enqueue(delta('Hello'));
+      await waitFor(() => expect(list.scrollTop).toBe(1000));
+
+      list.scrollTop = 200;
+      fireEvent.scroll(list);
+
+      box.scrollHeight = 1500;
+      controller.enqueue(delta(' world'));
+      await waitFor(() =>
+        expect(screen.getByTestId('chat-message-assistant')).toHaveTextContent('Hello world'),
+      );
+      expect(list.scrollTop).toBe(200);
+      controller.close();
+    });
+  });
 });
 
 describe('consumeSse', () => {

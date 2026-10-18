@@ -56,13 +56,24 @@ export default function ChatPanel() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [model, setModel] = useState<ModelTier>('MEDIUM');
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // Follow the stream only while the user is at the bottom; scrolling up to re-read pauses it.
+  const stickToBottomRef = useRef(true);
   const nextIdRef = useRef(1);
   const conversationId = useMemo(newConversationId, []);
 
+  // Keyed on `messages`, not `messages.length`: streamed deltas grow the last bubble's text
+  // without adding a message, and the list must follow them.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth' });
-  }, [messages.length]);
+    const el = listRef.current;
+    if (el && stickToBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const onListScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  };
 
   const appendUser = (text: string) => {
     const id = nextIdRef.current++;
@@ -94,6 +105,7 @@ export default function ChatPanel() {
     appendUser(trimmed);
     setInput('');
     setSending(true);
+    stickToBottomRef.current = true;
 
     const assistantId = startAssistantBubble();
 
@@ -141,6 +153,8 @@ export default function ChatPanel() {
     >
       <div
         data-testid="chat-messages"
+        ref={listRef}
+        onScroll={onListScroll}
         style={{
           display: 'flex',
           flexDirection: 'column',
@@ -172,7 +186,6 @@ export default function ChatPanel() {
             </div>
           ))
         )}
-        <div ref={bottomRef} />
       </div>
       <Space.Compact style={{ width: '100%' }}>
         <Select<ModelTier>
