@@ -4,29 +4,56 @@ sequenceDiagram
     participant nginx
     participant SCG as api-gateway (Spring Cloud Gateway)
     participant Calc as calculation-service
+    participant CalcDB as Postgres (calc schema)
     participant Kafka
     participant Gateway as ai-gateway
-    participant OpenAI
+    participant AiDB as Postgres (ai schema)
+    participant OpenAI as OpenAI Batch API
 
-    %% --- Submit a job (multipart file upload) ---
-    Browser->>nginx: POST /api/summarize (multipart files[])
+    %% --- Submit a job (multipart .txt upload) ---
+    Browser->>nginx: POST /api/summarize (multipart prompt + files[])
     nginx->>SCG: proxy_pass
     SCG->>Calc: lb://calculation-service /summarize (StripPrefix=1)
-    Calc-->>Browser: 202 { jobId, status: PENDING }
+    Calc->>CalcDB: insert job (PENDING) + one file row per upload (PENDING, correlationId)
+    loop per file
+        Calc->>Kafka: produce summarization-requests (key = correlationId)<br/>{ jobId, fileId, correlationId, instruction, content }
+    end
+    Calc-->>Browser: 200 { jobId, correlationIds }
 
-    %% --- Async heavy work consults AI via Kafka request/reply ---
-    Calc->>Kafka: produce summarization-requests { correlationId, content }
-    Kafka->>Gateway: consume summarization-requests
-    Gateway->>OpenAI: BatchClient.submit / ChatClient.call
-    OpenAI-->>Gateway: result
-    Gateway->>Kafka: produce summarization-responses { correlationId, result }
-    Kafka->>Calc: consume summarization-responses (matching correlationId)
-    Calc->>Calc: persist final result, mark job DONE / PARTIAL / FAILED
+    %% --- ai-gateway: batch-listener turns one Kafka poll into one OpenAI batch ---
+    Kafka->>Gateway: SummarizationBatchConsumer.onBatch(List<SummarizationRequestMessage>)
+    Gateway->>OpenAI: BatchProvider.submit (all items, ModelTier.FAST)
+    OpenAI-->>Gateway: providerBatchId
+    Gateway->>AiDB: insert batch_correlations (one row per item, IN_PROGRESS)
+
+    %% --- ai-gateway: BatchPoller every app.ai.batch.poll-interval-ms (30 s) ---
+    loop every 30 s while open batches exist
+        Gateway->>AiDB: findOpenProviderBatchIds()
+        Gateway->>OpenAI: BatchProvider.poll(providerBatchId)
+        alt Pending / InProgress
+            OpenAI-->>Gateway: status (wait for next tick)
+        else Completed
+            OpenAI-->>Gateway: Completed
+            Gateway->>OpenAI: BatchProvider.fetchResults
+            OpenAI-->>Gateway: results (matched by correlationId)
+            Gateway->>Kafka: produce summarization-responses per item<br/>{ correlationId, DONE | FAILED, summary, model, tokens }
+            Gateway->>AiDB: markDone / markFailed per correlationId
+        else Failed
+            OpenAI-->>Gateway: Failed(reason)
+            Gateway->>Kafka: produce summarization-responses FAILED for every item
+            Gateway->>AiDB: markFailed per correlationId
+        end
+    end
+
+    %% --- calculation-service: apply responses, roll up job ---
+    Kafka->>Calc: SummarizationResponseConsumer.onMessage
+    Calc->>CalcDB: markDone / markFailed file by correlationId (no-op if already terminal)
+    Calc->>CalcDB: when all files terminal → job DONE / PARTIAL / FAILED
 
     %% --- Browser polls every 1500 ms ---
-    loop until terminal
+    loop until job is terminal
         Browser->>nginx: GET /api/summarize/{jobId}
         nginx->>SCG: proxy_pass
         SCG->>Calc: lb://calculation-service /summarize/{jobId}
-        Calc-->>Browser: { status: PENDING | RUNNING | DONE | PARTIAL | FAILED }
+        Calc-->>Browser: { job status: PENDING | DONE | PARTIAL | FAILED, files[] }
     end
