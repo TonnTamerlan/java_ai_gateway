@@ -124,13 +124,22 @@ class SummarizeControllerTest {
     @Test
     void listFilesReturnsPagedView() throws Exception {
         UUID jobId = UUID.randomUUID();
-        SummarizationFile row = new SummarizationFile(
-                UUID.randomUUID(), 0L, jobId, UUID.randomUUID(),
-                "alpha.txt", "body", "do it", FileStatus.DONE,
-                "summary", "gpt-4o-mini", 11, 7, null,
-                Instant.parse("2026-05-19T09:00:00Z"),
-                Instant.parse("2026-05-19T09:01:00Z"),
-                null);
+        SummarizationFile row = SummarizationFile.builder()
+                .id(UUID.randomUUID())
+                .version(0L)
+                .jobId(jobId)
+                .correlationId(UUID.randomUUID())
+                .fileName("alpha.txt")
+                .originalText("body")
+                .instruction("do it")
+                .status(FileStatus.DONE)
+                .summary("summary")
+                .model("gpt-4o-mini")
+                .promptTokens(11)
+                .completionTokens(7)
+                .createdAt(Instant.parse("2026-05-19T09:00:00Z"))
+                .updatedAt(Instant.parse("2026-05-19T09:01:00Z"))
+                .build();
         Pageable expectedPageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<SummarizationFile> page = new PageImpl<>(List.of(row), expectedPageable, 1);
         given(files.search(isNull(), isNull(), any(Pageable.class))).willReturn(page);

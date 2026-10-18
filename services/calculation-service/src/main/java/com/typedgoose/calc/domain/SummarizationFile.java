@@ -1,5 +1,6 @@
 package com.typedgoose.calc.domain;
 
+import lombok.Builder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
 import org.springframework.data.relational.core.mapping.Table;
@@ -7,6 +8,7 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.time.Instant;
 import java.util.UUID;
 
+@Builder
 @Table(schema = "calc", name = "summarization_files")
 public record SummarizationFile(
         @Id UUID id,

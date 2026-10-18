@@ -34,23 +34,29 @@ public class SummarizationService {
         // SummarizationFile.correlationId (per-file UUID, Kafka message key) is a separate
         // concept from the MDC `correlationId` baggage minted at api-gateway. Don't conflate.
         try (var ignored = tracer.createBaggageInScope("jobId", jobId.toString())) {
-            jobs.save(new SummarizationJob(jobId, null, now, now, JobStatus.PENDING, inputs.size()));
+            jobs.save(SummarizationJob.builder()
+                    .id(jobId)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .status(JobStatus.PENDING)
+                    .fileCount(inputs.size())
+                    .build());
 
             List<UUID> correlationIds = new ArrayList<>(inputs.size());
             List<SummarizationFile> persisted = new ArrayList<>(inputs.size());
             for (FileInput input : inputs) {
                 UUID correlationId = UUID.randomUUID();
-                SummarizationFile file = new SummarizationFile(
-                        UUID.randomUUID(),
-                        null,
-                        jobId,
-                        correlationId,
-                        input.filename(),
-                        input.content(),
-                        prompt,
-                        FileStatus.PENDING,
-                        null, null, null, null, null,
-                        now, now, null);
+                SummarizationFile file = SummarizationFile.builder()
+                        .id(UUID.randomUUID())
+                        .jobId(jobId)
+                        .correlationId(correlationId)
+                        .fileName(input.filename())
+                        .originalText(input.content())
+                        .instruction(prompt)
+                        .status(FileStatus.PENDING)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build();
                 files.save(file);
                 correlationIds.add(correlationId);
                 persisted.add(file);

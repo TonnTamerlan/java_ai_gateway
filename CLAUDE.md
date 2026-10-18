@@ -79,6 +79,7 @@ Local copy of `infra/docker/.env` is required (any value for `OPENAI_API_KEY`); 
 - **Do not introduce Pact** until Step 12.
 - TDD is rigid for unit + Spring slice layers; flexible for integration / e2e.
 - JSON logging only (no `System.out.println`).
+- Records with more than 3 components get Lombok `@Builder`; construct them via `X.builder()…build()`, not positional `new X(...)`.
 - Per-service code stays inside its own module. Cross-cutting types go to `services/shared-contracts` — vendor-pure (no Spring AI, no SDK imports).
 
 ## Cross-session workflow

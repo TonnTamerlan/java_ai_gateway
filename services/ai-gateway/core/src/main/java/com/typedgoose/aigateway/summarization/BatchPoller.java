@@ -82,18 +82,19 @@ public class BatchPoller {
             }
             try (var ignored = tracer.createBaggageInScope("jobId", row.jobId().toString())) {
                 Optional<String> error = result.error();
-                SummarizationResponseMessage msg = new SummarizationResponseMessage(
-                        row.jobId(),
-                        row.fileId(),
-                        row.correlationId(),
-                        error.isPresent()
+                SummarizationResponseMessage msg = SummarizationResponseMessage.builder()
+                        .jobId(row.jobId())
+                        .fileId(row.fileId())
+                        .correlationId(row.correlationId())
+                        .status(error.isPresent()
                                 ? SummarizationResponseMessage.Status.FAILED
-                                : SummarizationResponseMessage.Status.DONE,
-                        error.isPresent() ? null : result.summary(),
-                        error.isPresent() ? null : result.model(),
-                        result.promptTokens(),
-                        result.completionTokens(),
-                        error.orElse(null));
+                                : SummarizationResponseMessage.Status.DONE)
+                        .summary(error.isPresent() ? null : result.summary())
+                        .model(error.isPresent() ? null : result.model())
+                        .promptTokens(result.promptTokens())
+                        .completionTokens(result.completionTokens())
+                        .errorMessage(error.orElse(null))
+                        .build();
                 responseTemplate.send(
                         KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
                         row.correlationId().toString(),
@@ -115,16 +116,13 @@ public class BatchPoller {
         Instant now = clock.instant();
         for (BatchCorrelation row : rows) {
             try (var ignored = tracer.createBaggageInScope("jobId", row.jobId().toString())) {
-                SummarizationResponseMessage msg = new SummarizationResponseMessage(
-                        row.jobId(),
-                        row.fileId(),
-                        row.correlationId(),
-                        SummarizationResponseMessage.Status.FAILED,
-                        null,
-                        null,
-                        0,
-                        0,
-                        "batch " + reason);
+                SummarizationResponseMessage msg = SummarizationResponseMessage.builder()
+                        .jobId(row.jobId())
+                        .fileId(row.fileId())
+                        .correlationId(row.correlationId())
+                        .status(SummarizationResponseMessage.Status.FAILED)
+                        .errorMessage("batch " + reason)
+                        .build();
                 responseTemplate.send(
                         KafkaConfig.SUMMARIZATION_RESPONSES_TOPIC,
                         row.correlationId().toString(),

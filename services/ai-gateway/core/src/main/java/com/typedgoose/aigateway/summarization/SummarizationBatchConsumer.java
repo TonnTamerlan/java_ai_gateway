@@ -37,11 +37,12 @@ public class SummarizationBatchConsumer {
 
         List<BatchSubmission.BatchItem> items = new ArrayList<>(messages.size());
         for (SummarizationRequestMessage m : messages) {
-            items.add(new BatchSubmission.BatchItem(
-                    m.correlationId(),
-                    ModelTier.FAST,
-                    m.instruction(),
-                    m.content()));
+            items.add(BatchSubmission.BatchItem.builder()
+                    .correlationId(m.correlationId())
+                    .modelTier(ModelTier.FAST)
+                    .instruction(m.instruction())
+                    .content(m.content())
+                    .build());
         }
 
         BatchHandle handle = batchProvider.submit(new BatchSubmission(items));
@@ -49,17 +50,16 @@ public class SummarizationBatchConsumer {
 
         List<BatchCorrelation> rows = new ArrayList<>(messages.size());
         for (SummarizationRequestMessage m : messages) {
-            rows.add(new BatchCorrelation(
-                    m.correlationId(),
-                    null,
-                    m.jobId(),
-                    m.fileId(),
-                    handle.providerBatchId(),
-                    m.instruction(),
-                    m.content(),
-                    BatchCorrelationStatus.IN_PROGRESS,
-                    now,
-                    null));
+            rows.add(BatchCorrelation.builder()
+                    .correlationId(m.correlationId())
+                    .jobId(m.jobId())
+                    .fileId(m.fileId())
+                    .providerBatchId(handle.providerBatchId())
+                    .instruction(m.instruction())
+                    .content(m.content())
+                    .status(BatchCorrelationStatus.IN_PROGRESS)
+                    .submittedAt(now)
+                    .build());
         }
         correlations.saveAll(rows);
 

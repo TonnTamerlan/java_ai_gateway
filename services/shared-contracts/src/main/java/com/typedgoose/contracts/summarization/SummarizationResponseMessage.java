@@ -1,7 +1,10 @@
 package com.typedgoose.contracts.summarization;
 
+import lombok.Builder;
+
 import java.util.UUID;
 
+@Builder
 public record SummarizationResponseMessage(
         UUID jobId,
         UUID fileId,

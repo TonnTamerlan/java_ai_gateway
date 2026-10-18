@@ -19,13 +19,13 @@ public class KafkaRequestPublisher implements RequestPublisher {
 
     @Override
     public void publish(SummarizationFile file) {
-        SummarizationRequestMessage message = new SummarizationRequestMessage(
-                file.jobId(),
-                file.id(),
-                file.correlationId(),
-                null,
-                file.instruction(),
-                file.originalText());
+        SummarizationRequestMessage message = SummarizationRequestMessage.builder()
+                .jobId(file.jobId())
+                .fileId(file.id())
+                .correlationId(file.correlationId())
+                .instruction(file.instruction())
+                .content(file.originalText())
+                .build();
         kafkaTemplate.send(KafkaConfig.SUMMARIZATION_REQUESTS_TOPIC,
                 file.correlationId().toString(),
                 message);

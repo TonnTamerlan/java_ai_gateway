@@ -2,10 +2,12 @@ package com.typedgoose.calc.api;
 
 import com.typedgoose.calc.domain.FileStatus;
 import com.typedgoose.calc.domain.SummarizationFile;
+import lombok.Builder;
 
 import java.time.Instant;
 import java.util.UUID;
 
+@Builder
 public record FileSummaryView(
         UUID id,
         UUID jobId,
@@ -22,12 +24,20 @@ public record FileSummaryView(
         Instant updatedAt) {
 
     public static FileSummaryView of(SummarizationFile f) {
-        return new FileSummaryView(
-                f.id(), f.jobId(), f.correlationId(),
-                f.fileName(), f.status(),
-                f.instruction(), f.summary(),
-                f.model(), f.promptTokens(), f.completionTokens(),
-                f.errorMessage(),
-                f.createdAt(), f.updatedAt());
+        return FileSummaryView.builder()
+                .id(f.id())
+                .jobId(f.jobId())
+                .correlationId(f.correlationId())
+                .fileName(f.fileName())
+                .status(f.status())
+                .instruction(f.instruction())
+                .summary(f.summary())
+                .model(f.model())
+                .promptTokens(f.promptTokens())
+                .completionTokens(f.completionTokens())
+                .errorMessage(f.errorMessage())
+                .createdAt(f.createdAt())
+                .updatedAt(f.updatedAt())
+                .build();
     }
 }

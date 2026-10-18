@@ -154,7 +154,12 @@ public class OpenAiBatchProvider implements BatchProvider {
             JsonNode errorNode = root.get("error");
             if (errorNode != null && !errorNode.isNull()) {
                 String msg = errorNode.path("message").asString("provider error");
-                return new BatchResult(correlationId, "", "", 0, 0, Optional.of(msg));
+                return BatchResult.builder()
+                        .correlationId(correlationId)
+                        .summary("")
+                        .model("")
+                        .error(Optional.of(msg))
+                        .build();
             }
 
             JsonNode body = root.path("response").path("body");
@@ -163,8 +168,14 @@ public class OpenAiBatchProvider implements BatchProvider {
             int promptTokens = body.path("usage").path("prompt_tokens").asInt(0);
             int completionTokens = body.path("usage").path("completion_tokens").asInt(0);
 
-            return new BatchResult(correlationId, content, model,
-                    promptTokens, completionTokens, Optional.empty());
+            return BatchResult.builder()
+                    .correlationId(correlationId)
+                    .summary(content)
+                    .model(model)
+                    .promptTokens(promptTokens)
+                    .completionTokens(completionTokens)
+                    .error(Optional.empty())
+                    .build();
         } catch (JacksonException e) {
             throw new ProviderException("failed to parse batch output line: " + line, e);
         }

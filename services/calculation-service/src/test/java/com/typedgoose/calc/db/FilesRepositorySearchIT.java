@@ -59,7 +59,13 @@ class FilesRepositorySearchIT {
 
         Instant base = Instant.parse("2026-05-19T10:00:00Z");
         jobId = UUID.randomUUID();
-        jobs.save(new SummarizationJob(jobId, null, base, base, JobStatus.PENDING, 5));
+        jobs.save(SummarizationJob.builder()
+                .id(jobId)
+                .createdAt(base)
+                .updatedAt(base)
+                .status(JobStatus.PENDING)
+                .fileCount(5)
+                .build());
 
         seedFile("alpha.txt",  FileStatus.PENDING, base.plusSeconds(10), "first prompt",  null);
         seedFile("beta.txt",   FileStatus.DONE,    base.plusSeconds(20), "second prompt", "summary B");
@@ -69,14 +75,22 @@ class FilesRepositorySearchIT {
     }
 
     private void seedFile(String name, FileStatus status, Instant at, String prompt, String summary) {
-        files.save(new SummarizationFile(
-                UUID.randomUUID(), null, jobId, UUID.randomUUID(),
-                name, "body of " + name, prompt, status,
-                summary, summary == null ? null : "gpt-4o-mini",
-                summary == null ? null : 100,
-                summary == null ? null : 50,
-                status == FileStatus.FAILED ? "boom" : null,
-                at, at, null));
+        files.save(SummarizationFile.builder()
+                .id(UUID.randomUUID())
+                .jobId(jobId)
+                .correlationId(UUID.randomUUID())
+                .fileName(name)
+                .originalText("body of " + name)
+                .instruction(prompt)
+                .status(status)
+                .summary(summary)
+                .model(summary == null ? null : "gpt-4o-mini")
+                .promptTokens(summary == null ? null : 100)
+                .completionTokens(summary == null ? null : 50)
+                .errorMessage(status == FileStatus.FAILED ? "boom" : null)
+                .createdAt(at)
+                .updatedAt(at)
+                .build());
     }
 
     @Test
