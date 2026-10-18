@@ -463,3 +463,34 @@ _"Use Feign instead of WebClient" sounds like an ergonomic preference. Investiga
 6. `./gradlew :services:chat-service:test` → 7/7 green. Live chat round-trip in the running stack proves both SSE *and* Eureka load-balancing still work.
 
 ---
+
+## 2026-10-18 — `@Builder` on records: 16 positional args → named fields, without breaking JDBC or Jackson
+_Records are great until one has 16 fields of mostly `UUID`/`String`/`Instant`; Lombok `@Builder` brings back named arguments and keeps the canonical constructor that Spring Data JDBC and Jackson rely on._
+
+### Built / fixed
+- `@Builder` on the 8 records with > 3 components: `SummarizationFile` (16), `FileSummaryView` (13), `BatchCorrelation` (10), `SummarizationResponseMessage` (9), plus `SummarizationJob`, `SummarizationRequestMessage`, `BatchResult`, `BatchSubmission.BatchItem`
+- All 13 positional `new X(...)` call sites, in main code and tests, rewritten as `X.builder()…build()`; a grep finds none left
+- New rule in `CLAUDE.md` Conventions, so future sessions follow it automatically (commit `e0d4188`)
+
+### Decisions and trade-offs
+- Threshold of **> 3 components**: below that, positional reads fine (`new Usage(prompt, completion)`); above it, same-typed neighbours (`jobId, fileId, correlationId`, all `UUID`) are easy to swap without the compiler noticing
+- Kept Lombok `compileOnly`: `shared-contracts` stays "vendor-pure" at runtime, and the generated builder is plain bytecode
+- Didn't add `@Builder.Default`: fields left out of the builder fall back to `null`/`0`, which matched what the old calls passed explicitly
+
+### Surprises / aha moments
+- **Builders delete code.** Every `null, null, null, null, null` placeholder just disappears. `finalizeFailed` goes from 10 positional args to 4 named setters — _stage cue: `git show e0d4188 -- '*BatchPoller.java'`_
+- **The one trap: `Optional` defaults to `null`, not `Optional.empty()`.** `BatchResult.error` has to be set explicitly at both call sites — _stage cue: `OpenAiBatchProvider.java:157-178`_
+- `@Builder` on a record with `@Table`/`@Id`/`@Version` just works. Spring Data JDBC still maps through the canonical constructor, which the Testcontainers ITs confirm against real Postgres
+
+### Code worth showing
+- `services/calculation-service/src/main/java/com/typedgoose/calc/domain/SummarizationService.java:49-59` — before: `prompt, FileStatus.PENDING, null, null, null, null, null, now, now, null`; after: you can see which field is which
+- `services/ai-gateway/core/src/main/java/com/typedgoose/aigateway/summarization/BatchPoller.java:119-125` — the failure envelope sets only the fields that matter
+
+### Demo flow this session enables
+1. Show the old `new SummarizationFile(` call. Ask the room: "which `null` is `deletedAt`?"
+2. Add `@Builder` to the record; nothing else on the record changes
+3. Show the rewritten call site and the diff stat
+4. `./gradlew build`: `FilesRepositorySearchIT` saves builder-made rows to Postgres and reads them back, all green
+5. Point at the `CLAUDE.md` line: the rule now applies in every future AI session
+
+---
