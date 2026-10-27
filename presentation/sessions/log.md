@@ -494,3 +494,31 @@ _Records are great until one has 16 fields of mostly `UUID`/`String`/`Instant`; 
 5. Point at the `CLAUDE.md` line: the rule now applies in every future AI session
 
 ---
+
+## 2026-10-27 — The fix that missed two services
+_A previous fix ("silence OTLP noise") was verified and committed, yet the same warning showed up in Kibana months later from two services its commit message said were "already clean". Convention plugins spread dependencies further than our mental model of them._
+
+### Built / fixed
+- Turned off the Micrometer OTLP meter registry in eureka-server and spring-boot-admin: `infra/eureka-server/src/main/resources/application.yml:44-50`, `infra/spring-boot-admin/src/main/resources/application.yml` (commit `039e409`)
+
+### Decisions and trade-offs
+- **Disabled** metrics export instead of redirecting it. Jaeger accepts only traces, so pointing the exporter at `jaeger:4318` would just turn `ConnectionRefused` into a 4xx
+
+### Surprises / aha moments
+- **The commit message was the bug.** `8cb8130` says "eureka-server and spring-boot-admin don't pull the starter and were already clean". In fact both apply `goose.spring-boot-conventions`, which adds `spring-boot-starter-opentelemetry` to every Boot app — _stage cue: `build-logic/src/main/groovy/goose.spring-boot-conventions.gradle:27`_
+- The original check was "0 warnings in 90s **across the four services**". The check was only as wide as the assumption behind it, so the two skipped services never got looked at
+- **Starter brings in a silent default:** `micrometer-registry-otlp` comes in transitively and publishes to `http://localhost:4318/v1/metrics`. Inside a container, `localhost` is the container itself, so it logs a refused connection every 60s, forever
+- Spring Boot Admin had logged 615 copies of the warning before anyone noticed. It took Kibana to surface it, not `docker logs`
+
+### Code worth showing
+- `build-logic/src/main/groovy/goose.spring-boot-conventions.gradle:13-28`: one `implementation` line in a convention plugin reaches 6 services
+- `git show 8cb8130 039e409 --stat`: four files in the first fix, then the two it missed
+
+### Demo flow this session enables
+1. In Kibana, filter `logger_name: OtlpMeterRegistry`; hits come from `eureka-server`
+2. Show the `8cb8130` commit message saying "already clean"
+3. Open the convention plugin: the starter is right there, applied to every Boot app
+4. Add the 4-line `enabled: false` block, rebuild, wait 90s: 0 hits; Jaeger still lists all 6 services
+5. Lesson: verify across **every module that applies the plugin**, not the list you think needs fixing
+
+---
