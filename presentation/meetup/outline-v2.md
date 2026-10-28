@@ -2,7 +2,7 @@
 
 _Version 2 of `outline.md`, rewritten in simple (B1) English. This file is edited by hand — it is not generated from `deck.html`._
 
-Planned length: **44 min** · 23 slides · English.
+Planned length: **47 min** · 24 slides · English.
 
 Deck controls: → / Space / PageDown = next (shows builds first) · ← = back · P = pause · R = restart animation · − / + = animation speed (0.25×–3×, saved) · 0 = 1× · F = full screen · S = window with speaker notes.
 
@@ -149,7 +149,7 @@ Deck controls: → / Space / PageDown = next (shows builds first) · ← = back 
 
 > 😄 Async is just sync without trust issues.
 
-## Part 5 · The whole system — 6 min
+## Part 5 · The whole system — 9 min
 
 ### 17. The whole system — platform pieces  _(2.5 min, starts at 33:00)_  🎞 looping animation
 
@@ -176,15 +176,22 @@ Deck controls: → / Space / PageDown = next (shows builds first) · ← = back 
 
 > 😄 Also running, but not on the diagram: my laptop fan — the loudest service in the architecture.
 
+### 20. Live: Typed Goose  _(3 min, starts at 39:00)_
+
+- This is the real app. It runs on this laptop — it is the same system as on the diagrams.
+- Chat: send one message and watch the answer come in, word by word.
+- Files: upload two files, start the summary, and watch the job change from PENDING to DONE. A batch can be slow — go on with the talk and come back later if needed.
+- Click on the dark area outside the frame to use the arrow keys again. The ‹ › buttons always work.
+
 ## Built with AI — 3 min
 
-### 20. How it was built: an AI pair, with a diary  _(1.5 min, starts at 39:00)_
+### 21. How it was built: an AI pair, with a diary  _(1.5 min, starts at 42:00)_
 
 - We built the project with an AI coding assistant as a pair programmer — not as a vending machine where you put in prompts.
 - The main problem: every session starts with an empty memory. So we write down everything important, in the repo, in files that the AI reads first.
 - Project instructions = the house rules. Steps = the plan, cut into parts so that one session finishes one step. ADRs = why we made decisions. Changelog = what really happened.
 
-### 21. The cross-session loop  _(1.5 min, starts at 40:30)_  🎞 looping animation
+### 22. The cross-session loop  _(1.5 min, starts at 43:30)_  🎞 looping animation
 
 - One loop for each session: read the next step → brainstorm with the human → plan → build → check → update the step file and the changelog → stop.
 - "Check" means real checks: the build is green, the containers are up, AND a real request goes through the feature. Look at how the packet jumps back once at "Verify" — that happened a lot.
@@ -195,10 +202,10 @@ Deck controls: → / Space / PageDown = next (shows builds first) · ← = back 
 
 ## Wrap-up — 2 min
 
-### 22. Takeaways  _(1.5 min, starts at 42:00)_
+### 23. Takeaways  _(1.5 min, starts at 45:00)_
 
 - Four takeaways, one sentence for each. Make a pause after the first one — it is the title of the talk.
 
-### 23. Thank you  _(0.5 min, starts at 43:30)_
+### 24. Thank you  _(0.5 min, starts at 46:30)_
 
 - Say thank you to the organizers. Answer questions. If the room is quiet, offer the live demo.

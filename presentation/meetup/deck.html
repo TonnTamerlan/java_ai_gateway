@@ -36,6 +36,18 @@
   .cap b { color: #fff; }
   .cap code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 20px; color: #ffd8a8; }
 
+  /* live UI frame */
+  .live-wrap { position: absolute; left: 0; right: 0; top: 0; bottom: 34px; border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden; background: var(--panel); }
+  iframe.live { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; display: none; }
+  iframe.live.up { display: block; }
+  .live-off { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; color: var(--muted); font-size: 26px; text-align: center; }
+  .live-off code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 19px; color: #ffd8a8; }
+  .live-off button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 18px; font-size: 20px; cursor: pointer; }
+  .live-hint { position: absolute; left: 0; right: 0; bottom: 0; font-size: 16px; color: var(--muted); text-align: center; }
+
   /* builds */
   .b { opacity: 0; transform: translateY(10px); transition: opacity .35s, transform .35s; }
   .b.on { opacity: 1; transform: none; }
@@ -502,6 +514,27 @@ const SLIDES = [
       'Optional: switch to the live demo here — send a chat message, upload two files, open the trace in Jaeger.',
     ],
     joke: 'Also running, not on the diagram: my laptop fan — the loudest service in the architecture.',
+  },
+  {
+    sec: 'arch', title: 'Live: Typed Goose', min: 3, live: true, noTitle: true,
+    html: `
+      <div class="body" style="top:28px;bottom:44px">
+        <div class="live-wrap">
+          <div class="live-off">
+            <div>🪿 The UI is not running.</div>
+            <code>docker compose -f infra/docker/docker-compose.yml up --wait</code>
+            <button class="live-reload">↻ Reload</button>
+          </div>
+          <iframe class="live" data-src="http://localhost/" title="Typed Goose UI"></iframe>
+        </div>
+        <div class="live-hint">click outside the frame to use the deck keys again</div>
+      </div>`,
+    notes: [
+      'This is the real app, running on this laptop — the same system as the diagrams.',
+      'Chat: send one message and watch the answer stream in, word by word.',
+      'Files: upload two files, start the summary, and watch the job go from PENDING to DONE (batch can be slow — move on and come back if needed).',
+      'Click on the dark area outside the frame to get the arrow keys back. The ‹ › buttons always work.',
+    ],
   },
 
   // ------------------------------------------------------------------ Built with AI
@@ -1409,6 +1442,7 @@ function go(i, o = {}) {
     scene.once = !!sl.once;
     SCENES[sl.scene](scene);
   }
+  if (sl.live) liveLoad(sl);
   history.replaceState(null, '', '#' + (cur + 1));
   document.querySelectorAll('#chips .ch').forEach(c => c.classList.toggle('on', c.dataset.k === sl.sec));
   $('pnum').textContent = `${cur + 1} / ${SLIDES.length}`;
@@ -1416,6 +1450,20 @@ function go(i, o = {}) {
   if (timerStart === null && cur > 0) timerStart = Date.now();
   sync();
 }
+// Live UI slide: load the iframe on first visit (and keep it, so the chat survives going back and forth).
+// A no-cors probe tells "stack is down" apart from "loaded" — a cross-origin frame can't report that itself.
+function liveLoad(sl, force) {
+  const frame = sl.el.querySelector('iframe.live'), off = sl.el.querySelector('.live-off');
+  if (!sl.liveWired) {
+    sl.liveWired = true;
+    sl.el.querySelector('.live-reload').onclick = () => liveLoad(sl, true);
+  }
+  if (frame.classList.contains('up') && !force) return;
+  fetch(frame.dataset.src, { mode: 'no-cors', cache: 'no-store' })
+    .then(() => { frame.src = frame.dataset.src; frame.classList.add('up'); off.style.display = 'none'; })
+    .catch(() => { frame.removeAttribute('src'); frame.classList.remove('up'); off.style.display = ''; });
+}
+
 function next() { const sl = SLIDES[cur]; if (build < sl.builds.length) { setBuild(build + 1); sync(); } else go(cur + 1); }
 function prev() { if (build > 0) { setBuild(build - 1); sync(); } else go(cur - 1, { allBuilds: true }); }
 
@@ -1500,6 +1548,8 @@ if (PRES) {
 
   addEventListener('keydown', e => { if (e.metaKey || e.ctrlKey || e.altKey) return; if (key(e.key)) e.preventDefault(); });
   addEventListener('message', e => { if (e.data && e.data.type === 'key') key(e.data.key); });
+  // a click outside the live UI frame takes keyboard focus back from it
+  stage.addEventListener('mousedown', () => { if (document.activeElement && document.activeElement.tagName === 'IFRAME') document.activeElement.blur(); });
   $('bPrev').onclick = prev; $('bNext').onclick = next; $('bPause').onclick = () => setPaused(!SIM.paused);
   $('bRestart').onclick = restartScene; $('bSlow').onclick = () => setSpeed(SIM.speed - .25); $('bFast').onclick = () => setSpeed(SIM.speed + .25);
   $('speed').oninput = e => setSpeed(parseFloat(e.target.value));
