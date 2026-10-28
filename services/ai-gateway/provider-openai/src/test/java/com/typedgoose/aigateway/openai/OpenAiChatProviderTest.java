@@ -32,9 +32,9 @@ class OpenAiChatProviderTest {
 
     private final ChatModel chatModel = mock(ChatModel.class);
     private final ModelTierMapper mapper = tier -> switch (tier) {
-        case FAST -> "gpt-4o-mini";
-        case MEDIUM -> "gpt-4o";
-        case SLOW -> "gpt-4-turbo";
+        case FAST -> "gpt-6-luna";
+        case MEDIUM -> "gpt-6.1-sol";
+        case SLOW -> "gpt-6-astra";
     };
     private final OpenAiChatProvider provider = new OpenAiChatProvider(chatModel, mapper);
 
@@ -95,7 +95,7 @@ class OpenAiChatProviderTest {
 
         Prompt sent = captor.getValue();
         OpenAiChatOptions opts = (OpenAiChatOptions) sent.getOptions();
-        assertThat(opts.getModel()).isEqualTo("gpt-4-turbo");
+        assertThat(opts.getModel()).isEqualTo("gpt-6-astra");
         assertThat(opts.getStreamOptions()).isNotNull();
         assertThat(opts.getStreamOptions().includeUsage()).isTrue();
     }
