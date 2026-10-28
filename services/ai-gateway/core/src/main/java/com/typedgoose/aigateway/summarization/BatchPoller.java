@@ -42,7 +42,7 @@ public class BatchPoller {
         if (openBatchIds.isEmpty()) {
             return;
         }
-        log.debug("polling {} open batches", openBatchIds.size());
+        log.info("polling {} open batches", openBatchIds.size());
         for (String batchId : openBatchIds) {
             try {
                 handleBatch(batchId);
@@ -57,8 +57,8 @@ public class BatchPoller {
         BatchStatus status = batchProvider.poll(handle);
 
         switch (status) {
-            case BatchStatus.Pending ignored -> log.debug("batch {} pending", providerBatchId);
-            case BatchStatus.InProgress ignored -> log.debug("batch {} in-progress", providerBatchId);
+            case BatchStatus.Pending ignored -> log.info("batch {} pending", providerBatchId);
+            case BatchStatus.InProgress ignored -> log.info("batch {} in-progress", providerBatchId);
             case BatchStatus.Completed ignored -> finalizeCompleted(handle);
             case BatchStatus.Failed failed -> finalizeFailed(handle, failed.reason());
         }
